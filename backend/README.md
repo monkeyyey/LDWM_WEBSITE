@@ -48,6 +48,56 @@ curl -X POST http://127.0.0.1:8000/watermark/generate \
   }'
 ```
 
+## Real GPU Mode on AWS
+
+The `sfwmark` adapter now has a real single-prompt generation path. On a CUDA EC2 instance, install the runtime packages:
+
+```bash
+cd ~/1-latent-watermark-inject-and-detect
+python3 -m pip install -r backend/requirements.gpu.txt
+```
+
+Check CUDA:
+
+```bash
+python3 - <<'PY'
+import torch
+print(torch.__version__)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
+PY
+```
+
+Start the backend:
+
+```bash
+python3 backend/server.py --host 0.0.0.0 --port 8000
+```
+
+Start the frontend:
+
+```bash
+cd watermark-lab
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+Open:
+
+```text
+http://<EC2_PUBLIC_IP>:5173
+```
+
+The real functional path is currently:
+
+```text
+SFWMark -> Generate Watermarked Image
+```
+
+It generates a real 512x512 Stable Diffusion image with a Fourier-ring latent watermark and returns it to the website preview. Detection for uploaded images is also wired for the same lightweight SFWMark path.
+
+Gaussian Shannon and LaWa still need their heavier repo-specific environments/checkpoints before they can run real inference.
+
 ## Normalized Endpoints
 
 ```text

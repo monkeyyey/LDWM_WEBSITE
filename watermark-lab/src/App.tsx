@@ -46,6 +46,7 @@ type Result = {
   bits: string
   runtime: string
   notes: string
+  imageUrl?: string | null
 }
 
 const methods: Method[] = [
@@ -123,6 +124,7 @@ function App() {
     bits: '--',
     runtime: '--',
     notes: 'Run a local mock job to preview the full workflow before connecting GPU workers.',
+    imageUrl: null,
   })
 
   const selectedMethod = useMemo(
@@ -176,6 +178,7 @@ function App() {
 
       const payload = await response.json()
       const backendResult = payload.result
+      const backendImageUrl = backendResult.image_url ? `${apiBase}${backendResult.image_url}` : null
       setResult({
         status: 'done',
         title: `${selectedMethod.name} backend job complete`,
@@ -183,7 +186,12 @@ function App() {
         bits: backendResult.recovered_payload,
         runtime: backendResult.runtime,
         notes: backendResult.logs?.join(' ') ?? 'Backend returned a normalized result.',
+        imageUrl: backendImageUrl,
       })
+      if (backendImageUrl) {
+        setUploadedImage(backendImageUrl)
+        setUploadName('Generated watermarked image')
+      }
       return
     } catch {
       window.setTimeout(() => {
@@ -203,6 +211,7 @@ function App() {
         runtime: selectedMethod.latency === 'High' ? '39.4s' : selectedMethod.latency === 'Medium' ? '22.8s' : '11.6s',
         notes:
           'Backend was not reachable, so this is frontend-only mock output.',
+        imageUrl: null,
       })
       }, 850)
     }
@@ -216,6 +225,7 @@ function App() {
       bits: '--',
       runtime: '--',
       notes: 'Run a local mock job to preview the full workflow before connecting GPU workers.',
+      imageUrl: null,
     })
   }
 

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from registry import MethodRegistry
 from schemas import WatermarkRequest
@@ -30,6 +31,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/methods":
             self._json({"methods": REGISTRY.list_methods()})
+            return
+        if path.startswith("/files/"):
+            self._serve_storage_file(path)
             return
         self._json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
@@ -86,6 +90,24 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("access-control-allow-origin", "*")
         self.send_header("access-control-allow-methods", "GET, POST, OPTIONS")
         self.send_header("access-control-allow-headers", "content-type")
+
+    def _serve_storage_file(self, path: str) -> None:
+        storage_root = (PROJECT_ROOT / "backend" / "storage").resolve()
+        requested = unquote(path.removeprefix("/files/"))
+        file_path = (storage_root / requested).resolve()
+        if storage_root not in file_path.parents and file_path != storage_root:
+            self._json({"error": "Invalid file path"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if not file_path.is_file():
+            self._json({"error": "File not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        content = file_path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self._send_cors_headers()
+        self.send_header("content-type", mimetypes.guess_type(file_path.name)[0] or "application/octet-stream")
+        self.send_header("content-length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
 
 def main() -> None:
