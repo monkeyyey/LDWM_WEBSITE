@@ -1,0 +1,53 @@
+{
+  "sfwmark": {
+    "name": "SFWMark",
+    "category": "Fourier latent watermark",
+    "repo_path": "../work/repos/SFWMark",
+    "native_workflows": ["generate", "detect", "attack"],
+    "not_native": ["post_hoc_upload_watermark"],
+    "default_config": {
+      "wm_type": "HSQR",
+      "wm_type_options": ["Tree-Ring", "RingID", "HSTR", "HSQR"],
+      "dataset_id_options": ["coco", "Gustavo", "DB1k"],
+      "quick_start_attacks": ["JPEG", "Diffusion", "CC", "RC"]
+    },
+    "payload": "keyed Fourier-domain latent watermark; repo CLI selects wm_type rather than arbitrary text payload",
+    "environment": "conda python=3.10; install.sh or requirements-lock.txt",
+    "notes": "Generation-time latent-noise watermarking. Detection uses DDIM inversion and Fourier-domain analysis."
+  },
+  "gaussian-shannon": {
+    "name": "Gaussian Shannon",
+    "category": "Communication-code latent watermark",
+    "repo_path": "../work/repos/Gaussian-Shannon",
+    "native_workflows": ["generate", "detect", "attack"],
+    "not_native": ["post_hoc_upload_watermark"],
+    "default_config": {
+      "model_id": "stabilityai/stable-diffusion-2-1",
+      "message_bits": 256,
+      "redundancy": 64,
+      "scheduler_options": ["DDIMScheduler", "DPMSolverSinglestepScheduler", "DPMSolverMultistepScheduler"]
+    },
+    "payload": "256-bit message encoded with Gaussian/LDPC communication coding",
+    "environment": "conda python=3.12; pip install -r requirements.txt",
+    "notes": "Repo code is function-oriented rather than a polished CLI. Adapter should call infer.py functions or wrap them with a small CLI."
+  },
+  "lawa": {
+    "name": "LaWa",
+    "category": "VAE latent watermark",
+    "repo_path": "../work/repos/LaWa",
+    "native_workflows": ["generate", "detect", "attack"],
+    "not_native": ["post_hoc_upload_watermark"],
+    "default_config": {
+      "config": "configs/SD14_LaWa_inference.yaml",
+      "weight": "weights/LaWa/last.ckpt",
+      "message_len": 48,
+      "sd_ckpt": "weights/stable-diffusion-v1/model.ckpt",
+      "default_prompt": "A white plate of food on a dining table",
+      "ddim_steps": 50,
+      "resolution": 512
+    },
+    "payload": "exactly 48 binary bits for the provided pretrained decoder",
+    "environment": "conda env create -f environment.yml; tested with python 3.8.17, pytorch 2.0.1, cuda 11.3",
+    "notes": "In-generation image watermarking through Stable Diffusion v1.4 and a modified decoder. Public script does not expose arbitrary uploaded-image embedding."
+  }
+}
