@@ -52,19 +52,20 @@ def main() -> int:
     if completed.returncode != 0:
         return completed.returncode
 
-    generated = sfw_dir / "src" / output_dir_name / "DB1k" / args.wm_type / "img_pil_wm" / "0.png"
-    clean = sfw_dir / "src" / output_dir_name / "DB1k" / args.wm_type / "img_pil" / "0.png"
-    pattern = sfw_dir / "src" / output_dir_name / "DB1k" / args.wm_type / "pattern_list-2048.pt"
-    identify = sfw_dir / "src" / output_dir_name / "DB1k" / args.wm_type / "identify_gt_indices_1.npy"
+    output_base = sfw_dir / output_dir_name / "DB1k" / args.wm_type
+    generated = first_png(output_base / "img_pil_wm")
+    clean = first_png(output_base / "img_pil")
+    pattern = output_base / "pattern_list-2048.pt"
+    identify = output_base / "identify_gt_indices_1.npy"
 
-    if not generated.is_file():
-        print(f"Expected generated image missing: {generated}", file=sys.stderr)
+    if generated is None:
+        print(f"Expected generated image missing under: {output_base / 'img_pil_wm'}", file=sys.stderr)
         return 3
 
     job_dir = project_root / "backend" / "storage" / "outputs" / args.job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(generated, job_dir / "watermarked.png")
-    if clean.is_file():
+    if clean is not None:
         shutil.copy2(clean, job_dir / "clean.png")
     if pattern.is_file():
         shutil.copy2(pattern, job_dir / "pattern_list-2048.pt")
@@ -81,7 +82,7 @@ def main() -> int:
                 "model_id": model_id,
                 "dataset_id": "DB1k",
                 "source_image": str(generated),
-                "clean_image": str(clean) if clean.is_file() else None,
+                "clean_image": str(clean) if clean is not None else None,
             },
             indent=2,
         ),
@@ -89,6 +90,12 @@ def main() -> int:
     )
     print(job_dir / "watermarked.png")
     return 0
+
+
+def first_png(directory: Path) -> Path | None:
+    if not directory.is_dir():
+        return None
+    return next(iter(sorted(directory.glob("*.png"))), None)
 
 
 def patch_generate_model_id(generate_py: Path, model_id: str) -> None:
