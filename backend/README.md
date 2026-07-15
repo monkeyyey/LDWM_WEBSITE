@@ -50,11 +50,12 @@ curl -X POST http://127.0.0.1:8000/watermark/generate \
 
 ## Real GPU Mode on AWS
 
-The `sfwmark` adapter now has a real single-prompt generation path. On a CUDA EC2 instance, install the runtime packages:
+The `sfwmark` adapter now defaults to an official SFWMark generation path. On a CUDA EC2 instance, set it up with:
 
 ```bash
 cd ~/1-latent-watermark-inject-and-detect
-python3 -m pip install -r backend/requirements.gpu.txt
+source .venv/bin/activate
+bash backend/integrations/sfwmark/setup_sfwmark.sh
 ```
 
 Check CUDA:
@@ -66,6 +67,33 @@ print(torch.__version__)
 print(torch.cuda.is_available())
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
 PY
+```
+
+Check backend runtime diagnostics:
+
+```bash
+python3 backend/server.py --host 0.0.0.0 --port 8000
+curl http://127.0.0.1:8000/runtime
+```
+
+Run a direct official SFWMark generation smoke test without the browser:
+
+```bash
+bash backend/integrations/sfwmark/smoke_official_generate.sh
+```
+
+If this succeeds, it writes:
+
+```text
+backend/storage/outputs/official-smoke-test/watermarked.png
+```
+
+If it fails, the printed logs should say whether the issue is missing packages, CUDA, Hugging Face model access, or another runtime error.
+
+If you want to use the lightweight built-in fallback instead of the official SFWMark repo path:
+
+```bash
+SFWMARK_OFFICIAL=0 python3 backend/server.py --host 0.0.0.0 --port 8000
 ```
 
 Start the backend:
@@ -94,7 +122,7 @@ The real functional path is currently:
 SFWMark -> Generate Watermarked Image
 ```
 
-It generates a real 512x512 Stable Diffusion image with a Fourier-ring latent watermark and returns it to the website preview. Detection for uploaded images is also wired for the same lightweight SFWMark path.
+It runs the official SFWMark `src/generate.py` against a one-prompt DB1k-compatible dataset, copies the generated watermarked image into backend storage, and returns it to the website preview.
 
 Gaussian Shannon and LaWa still need their heavier repo-specific environments/checkpoints before they can run real inference.
 

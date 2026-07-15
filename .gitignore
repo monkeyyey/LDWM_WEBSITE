@@ -3,6 +3,8 @@ __pycache__/
 
 work/
 outputs/
+external/
+backend/storage/
 
 .DS_Store
 *.log

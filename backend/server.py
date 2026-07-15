@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from registry import MethodRegistry
+from runtimes.sfwmark_lite import runtime_report
 from schemas import WatermarkRequest
 
 
@@ -31,6 +32,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/methods":
             self._json({"methods": REGISTRY.list_methods()})
+            return
+        if path == "/runtime":
+            self._json({"runtime": runtime_report()})
             return
         if path.startswith("/files/"):
             self._serve_storage_file(path)

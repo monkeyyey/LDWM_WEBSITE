@@ -420,6 +420,10 @@ input[type='range'] {
   background: #e7f2eb;
 }
 
+.status-strip.error {
+  background: #fbe7e5;
+}
+
 .metric-grid {
   display: grid;
   gap: 10px;

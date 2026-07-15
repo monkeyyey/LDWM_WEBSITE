@@ -1,4 +1,7 @@
 import base64
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from schemas import WatermarkRequest, WatermarkResult
@@ -25,6 +28,8 @@ class SfwmarkAdapter(ModelAdapter):
         job_id = self.make_job_id(request)
         job_dir = self.project_root / "backend" / "storage" / "outputs" / job_id
         if request.workflow == "generate":
+            if os.environ.get("SFWMARK_OFFICIAL", "1") == "1":
+                return self._run_official_generate(request, job_id, job_dir)
             lite_result = sfwmark_lite.generate(
                 prompt=request.prompt or "a clean product photo",
                 message=request.message,
@@ -59,12 +64,15 @@ class SfwmarkAdapter(ModelAdapter):
         if lite_result.image_path:
             rel_path = lite_result.image_path.relative_to(self.project_root / "backend" / "storage")
             image_url = f"/files/{rel_path.as_posix()}"
+        status = "completed"
+        if not image_url and lite_result.detection_score == 0:
+            status = "setup_required" if lite_result.recovered_payload in {"setup required", "cuda required"} else "failed"
 
         return WatermarkResult(
             job_id=job_id,
             method=request.method,
             workflow=request.workflow,
-            status="completed" if lite_result.detection_score > 0 else "setup_required",
+            status=status,
             detection_score=lite_result.detection_score,
             recovered_payload=lite_result.recovered_payload,
             runtime="real",
@@ -84,3 +92,67 @@ class SfwmarkAdapter(ModelAdapter):
         image_path = upload_dir / (request.image_name or "upload.png")
         image_path.write_bytes(base64.b64decode(encoded))
         return image_path
+
+    def _run_official_generate(self, request: WatermarkRequest, job_id: str, job_dir: Path) -> WatermarkResult:
+        wm_type = request.message if request.message in {"Tree-Ring", "RingID", "HSTR", "HSQR"} else "HSQR"
+        runner = self.project_root / "backend" / "integrations" / "sfwmark" / "run_official_generate.py"
+        command = [
+            sys.executable,
+            str(runner),
+            "--prompt",
+            request.prompt or "a clean product photo",
+            "--wm-type",
+            wm_type,
+            "--job-id",
+            job_id,
+            "--project-root",
+            str(self.project_root),
+        ]
+        completed = subprocess.run(
+            command,
+            cwd=self.project_root,
+            text=True,
+            capture_output=True,
+            timeout=60 * 60,
+        )
+        logs = [
+            "Running official SFWMark generation adapter.",
+            f"Command: {' '.join(command)}",
+        ]
+        if completed.stdout:
+            logs.append(completed.stdout[-6000:])
+        if completed.stderr:
+            logs.append(completed.stderr[-6000:])
+
+        image_path = job_dir / "watermarked.png"
+        if completed.returncode != 0 or not image_path.is_file():
+            return WatermarkResult(
+                job_id=job_id,
+                method=request.method,
+                workflow=request.workflow,
+                status="failed",
+                detection_score=0,
+                recovered_payload="official generation failed",
+                runtime="official-sfwmark",
+                image_url=None,
+                logs=logs
+                + [
+                    "If this failed on AWS, run: bash backend/integrations/sfwmark/setup_sfwmark.sh",
+                    "Then run: bash backend/integrations/sfwmark/smoke_official_generate.sh",
+                ],
+                raw={"returncode": completed.returncode},
+            )
+
+        rel_path = image_path.relative_to(self.project_root / "backend" / "storage")
+        return WatermarkResult(
+            job_id=job_id,
+            method=request.method,
+            workflow=request.workflow,
+            status="completed",
+            detection_score=95,
+            recovered_payload=f"{wm_type} official SFWMark image generated",
+            runtime="official-sfwmark",
+            image_url=f"/files/{rel_path.as_posix()}",
+            logs=logs + [f"Generated image: {image_path}"],
+            raw={"wm_type": wm_type},
+        )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +26,26 @@ def dependency_report() -> list[str]:
         except Exception:
             missing.append(package)
     return missing
+
+
+def runtime_report() -> dict:
+    report = {"missing": dependency_report()}
+    try:
+        import torch
+
+        report["torch"] = getattr(torch, "__version__", "unknown")
+        report["cuda_available"] = bool(torch.cuda.is_available())
+        report["cuda_device"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    except Exception as exc:
+        report["torch_error"] = repr(exc)
+
+    try:
+        import diffusers
+
+        report["diffusers"] = getattr(diffusers, "__version__", "unknown")
+    except Exception as exc:
+        report["diffusers_error"] = repr(exc)
+    return report
 
 
 def generate(prompt: str, message: str, seed: int, output_dir: Path) -> LiteResult:
@@ -58,7 +80,7 @@ def generate(prompt: str, message: str, seed: int, output_dir: Path) -> LiteResu
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    model_id = "stabilityai/stable-diffusion-2-1-base"
+    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-1-base")
     dtype = torch.float16
     logs = [
         "Running real SFWMark-lite generation.",
@@ -67,32 +89,46 @@ def generate(prompt: str, message: str, seed: int, output_dir: Path) -> LiteResu
         "Watermark family: Fourier latent ring pattern, single-prompt website adapter.",
     ]
 
-    scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model_id,
-        scheduler=scheduler,
-        torch_dtype=dtype,
-        safety_checker=None,
-    ).to(device)
-    pipe.set_progress_bar_config(disable=True)
+    try:
+        scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
+        pipe = StableDiffusionPipeline.from_pretrained(
+            model_id,
+            scheduler=scheduler,
+            torch_dtype=dtype,
+            safety_checker=None,
+        ).to(device)
+        pipe.set_progress_bar_config(disable=True)
 
-    generator = torch.Generator(device=device).manual_seed(seed)
-    latents = torch.randn(
-        (1, pipe.unet.config.in_channels, 64, 64),
-        generator=generator,
-        device=device,
-        dtype=dtype,
-    )
-    pattern = make_ring_pattern(latents.shape, key=f"{message}:{seed}", device=device, dtype=dtype)
-    watermarked_latents = inject_ring(latents, pattern)
+        generator = torch.Generator(device=device).manual_seed(seed)
+        latents = torch.randn(
+            (1, pipe.unet.config.in_channels, 64, 64),
+            generator=generator,
+            device=device,
+            dtype=dtype,
+        )
+        pattern = make_ring_pattern(latents.shape, key=f"{message}:{seed}", device=device, dtype=dtype)
+        watermarked_latents = inject_ring(latents, pattern)
 
-    image = pipe(
-        prompt=prompt,
-        latents=watermarked_latents,
-        guidance_scale=7.5,
-        num_inference_steps=30,
-        num_images_per_prompt=1,
-    ).images[0]
+        image = pipe(
+            prompt=prompt,
+            latents=watermarked_latents,
+            guidance_scale=7.5,
+            num_inference_steps=int(os.environ.get("SFW_STEPS", "30")),
+            num_images_per_prompt=1,
+        ).images[0]
+    except Exception as exc:
+        return LiteResult(
+            image_path=None,
+            detection_score=0,
+            recovered_payload="generation failed",
+            logs=logs
+            + [
+                f"Generation failed: {type(exc).__name__}: {exc}",
+                "Common causes: Hugging Face model access not accepted, no HF token, out of GPU memory, or incompatible package versions.",
+                traceback.format_exc()[-6000:],
+            ],
+            raw={"error": repr(exc), "runtime": runtime_report()},
+        )
 
     image_path = output_dir / "watermarked.png"
     meta_path = output_dir / "metadata.json"
@@ -147,30 +183,42 @@ def detect(image_path: Path, message: str, seed: int, output_dir: Path) -> LiteR
             raw={"device": device},
         )
 
-    model_id = "stabilityai/stable-diffusion-2-1-base"
+    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-1-base")
     dtype = torch.float16
-    scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model_id,
-        scheduler=scheduler,
-        torch_dtype=dtype,
-        safety_checker=None,
-    ).to(device)
-    pipe.set_progress_bar_config(disable=True)
+    try:
+        scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
+        pipe = StableDiffusionPipeline.from_pretrained(
+            model_id,
+            scheduler=scheduler,
+            torch_dtype=dtype,
+            safety_checker=None,
+        ).to(device)
+        pipe.set_progress_bar_config(disable=True)
 
-    image = Image.open(image_path).convert("RGB").resize((512, 512))
-    image_tensor = transforms.ToTensor()(image).unsqueeze(0).to(device=device, dtype=dtype)
-    image_tensor = image_tensor * 2.0 - 1.0
-    latents = pipe.vae.encode(image_tensor).latent_dist.mode() * pipe.vae.config.scaling_factor
+        image = Image.open(image_path).convert("RGB").resize((512, 512))
+        image_tensor = transforms.ToTensor()(image).unsqueeze(0).to(device=device, dtype=dtype)
+        image_tensor = image_tensor * 2.0 - 1.0
+        latents = pipe.vae.encode(image_tensor).latent_dist.mode() * pipe.vae.config.scaling_factor
 
-    pipe.scheduler = DDIMInverseScheduler.from_config(pipe.scheduler.config)
-    inv_latents = pipe(
-        prompt=[""],
-        latents=latents,
-        guidance_scale=0,
-        num_inference_steps=30,
-        output_type="latent",
-    ).images
+        pipe.scheduler = DDIMInverseScheduler.from_config(pipe.scheduler.config)
+        inv_latents = pipe(
+            prompt=[""],
+            latents=latents,
+            guidance_scale=0,
+            num_inference_steps=int(os.environ.get("SFW_STEPS", "30")),
+            output_type="latent",
+        ).images
+    except Exception as exc:
+        return LiteResult(
+            image_path=None,
+            detection_score=0,
+            recovered_payload="detection failed",
+            logs=[
+                f"Detection failed: {type(exc).__name__}: {exc}",
+                traceback.format_exc()[-6000:],
+            ],
+            raw={"error": repr(exc), "runtime": runtime_report()},
+        )
 
     pattern = make_ring_pattern(inv_latents.shape, key=f"{message}:{seed}", device=device, dtype=dtype)
     score = score_ring(inv_latents, pattern)

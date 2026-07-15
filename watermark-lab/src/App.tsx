@@ -47,6 +47,7 @@ type Result = {
   runtime: string
   notes: string
   imageUrl?: string | null
+  isError?: boolean
 }
 
 const methods: Method[] = [
@@ -173,7 +174,18 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error(`Backend returned ${response.status}`)
+        const errorPayload = await response.json().catch(() => ({}))
+        setResult({
+          status: 'done',
+          title: 'Backend request failed',
+          score: 0,
+          bits: '--',
+          runtime: '--',
+          notes: errorPayload.error ?? `Backend returned ${response.status}`,
+          imageUrl: null,
+          isError: true,
+        })
+        return
       }
 
       const payload = await response.json()
@@ -187,6 +199,7 @@ function App() {
         runtime: backendResult.runtime,
         notes: backendResult.logs?.join(' ') ?? 'Backend returned a normalized result.',
         imageUrl: backendImageUrl,
+        isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
       })
       if (backendImageUrl) {
         setUploadedImage(backendImageUrl)
@@ -374,7 +387,7 @@ function App() {
               <h3>Results</h3>
             </div>
 
-            <div className={`status-strip ${result.status}`}>
+            <div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>
               {result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}
               <span>{result.title}</span>
             </div>
