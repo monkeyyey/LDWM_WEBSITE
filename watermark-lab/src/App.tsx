@@ -51,6 +51,25 @@ type Result = {
   jobId?: string | null
 }
 
+type BackendResult = {
+  job_id?: string
+  status: string
+  workflow: Mode
+  detection_score: number
+  recovered_payload: string
+  runtime: string
+  image_url?: string | null
+  raw?: {
+    wm_type?: string
+    model_id?: string
+    matched?: boolean
+    key_index?: number
+    predicted_index?: number
+    distance?: number
+    source_job_id?: string
+  }
+}
+
 const methods: Method[] = [
   {
     id: 'sfwmark',
@@ -195,16 +214,16 @@ function App() {
       }
 
       const payload = await response.json()
-      const backendResult = payload.result
+      const backendResult = payload.result as BackendResult
       const backendImageUrl = backendResult.image_url ? `${apiBase}${backendResult.image_url}` : null
       const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
-        title: `${selectedMethod.name} backend job complete`,
+        title: resultTitle(selectedMethod.name, mode, backendResult),
         score: backendResult.detection_score,
         bits: backendResult.recovered_payload,
         runtime: backendResult.runtime,
-        notes: backendResult.logs?.join(' ') ?? 'Backend returned a normalized result.',
+        notes: resultSummary(mode, backendResult, backendImageUrl),
         imageUrl: backendImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
         jobId: backendJobId,
@@ -227,6 +246,36 @@ function App() {
         isError: true,
       })
     }
+  }
+
+  function resultTitle(methodName: string, workflow: Mode, backendResult: BackendResult) {
+    if (backendResult.status === 'failed' || backendResult.status === 'setup_required') {
+      return `${methodName} ${workflow} failed`
+    }
+    return workflow === 'generate' ? `${methodName} generation complete` : `${methodName} detection complete`
+  }
+
+  function resultSummary(workflow: Mode, backendResult: BackendResult, imageUrl: string | null) {
+    if (backendResult.status === 'failed' || backendResult.status === 'setup_required') {
+      return backendResult.recovered_payload || 'The backend could not complete this run.'
+    }
+
+    const wmType = backendResult.raw?.wm_type ?? message
+    if (workflow === 'generate') {
+      return imageUrl
+        ? `${wmType} watermarked image generated and ready for detection.`
+        : `${wmType} generation completed.`
+    }
+
+    const raw = backendResult.raw
+    if (raw?.matched) {
+      const distance = typeof raw.distance === 'number' ? raw.distance.toFixed(4) : 'recorded'
+      return `Watermark matched key ${raw.key_index}. Distance: ${distance}.`
+    }
+    if (raw) {
+      return `Watermark did not match. Expected key ${raw.key_index}, predicted ${raw.predicted_index}.`
+    }
+    return backendResult.recovered_payload || 'Detection completed.'
   }
 
   function resetRun() {
