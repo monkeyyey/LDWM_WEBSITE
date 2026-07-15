@@ -26,7 +26,7 @@ def main() -> int:
         return 2
 
     src_dir = sfw_dir / "src"
-    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-base")
+    model_id = os.environ.get("SFW_MODEL_ID", "sd2-community/stable-diffusion-2-1-base")
     patch_generate_model_id(src_dir / "generate.py", model_id)
 
     dataset_dir = src_dir / "text_dataset" / "DiffusionDB"
