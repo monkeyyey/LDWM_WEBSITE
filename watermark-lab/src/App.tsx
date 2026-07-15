@@ -85,6 +85,8 @@ type JobSummary = {
   clean_image_url?: string | null
 }
 
+const sfwmarkTypes = ['HSQR', 'HSTR', 'Tree-Ring', 'RingID']
+
 const methods: Method[] = [
   {
     id: 'sfwmark',
@@ -100,7 +102,7 @@ const methods: Method[] = [
     color: '#136f63',
     messageLabel: 'Watermark type',
     defaultMessage: 'HSQR',
-    repoDefaults: ['wm_type: HSQR', 'dataset_id: coco | Gustavo | DB1k', 'attacks: JPEG, Diffusion, CC, RC'],
+    repoDefaults: ['wm_type: HSQR | HSTR | Tree-Ring | RingID', 'dataset_id: DB1k web prompt', 'detect: saved job artifacts'],
     attacks: ['None', 'JPEG', 'Diffusion', 'Center crop (CC)', 'Random crop (RC)', 'Blur', 'Noise', 'Brightness', 'Contrast'],
   },
   {
@@ -488,7 +490,15 @@ function App() {
             <div className="field-row">
               <label className="field">
                 <span>{mode === 'detect' ? 'Watermark type metadata' : selectedMethod.messageLabel}</span>
-                <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'} />
+                {selectedMethod.id === 'sfwmark' ? (
+                  <select value={message} onChange={(event) => setMessage(event.target.value)} disabled={mode === 'detect'}>
+                    {sfwmarkTypes.map((wmType) => (
+                      <option key={wmType}>{wmType}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={message} onChange={(event) => setMessage(event.target.value)} />
+                )}
               </label>
               <label className="field small-field">
                 <span>Seed</span>
