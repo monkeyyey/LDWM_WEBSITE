@@ -31,7 +31,7 @@ rm -f "${FILTERED_REQ}"
 # The upstream SFWMark requirements currently miss a few imports used by
 # src/utils.py and src/generate.py. Keep these explicit so the smoke test
 # fails on model/runtime issues instead of missing utility packages.
-python -m pip install "qrcode[pil]" pyzbar tqdm
+python -m pip install "qrcode[pil]" pyzbar tqdm "huggingface_hub[cli]>=0.24.0,<1.0"
 
 python - <<'PY'
 import torch
