@@ -126,9 +126,19 @@ const methods: Method[] = [
 
 const seedPreview =
   'linear-gradient(135deg, #f4efe4 0%, #dce9e2 36%, #9eb6c6 68%, #2f3a4a 100%)'
+const currentLocation = globalThis.location
+const isLocalFrontend =
+  currentLocation?.hostname === 'localhost' ||
+  currentLocation?.hostname === '127.0.0.1' ||
+  currentLocation?.hostname === ''
 const apiBase =
   import.meta.env.VITE_API_BASE ??
-  `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8000`
+  (isLocalFrontend
+    ? `${currentLocation?.protocol ?? 'http:'}//${currentLocation?.hostname ?? '127.0.0.1'}:8000`
+    : `${currentLocation?.origin ?? ''}/api`)
+const fileBase =
+  import.meta.env.VITE_FILE_BASE ??
+  (isLocalFrontend ? apiBase : (currentLocation?.origin ?? ''))
 
 function App() {
   const [mode, setMode] = useState<Mode>('generate')
@@ -215,7 +225,7 @@ function App() {
 
       const payload = await response.json()
       const backendResult = payload.result as BackendResult
-      const backendImageUrl = backendResult.image_url ? `${apiBase}${backendResult.image_url}` : null
+      const backendImageUrl = backendResult.image_url ? `${fileBase}${backendResult.image_url}` : null
       const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
