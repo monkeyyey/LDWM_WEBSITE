@@ -48,6 +48,7 @@ type Result = {
   notes: string
   imageUrl?: string | null
   isError?: boolean
+  jobId?: string | null
 }
 
 const methods: Method[] = [
@@ -120,6 +121,7 @@ function App() {
   const [attack, setAttack] = useState(methods[0].attacks[0])
   const [uploadName, setUploadName] = useState('No image selected')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [sourceJobId, setSourceJobId] = useState<string | null>(null)
   const [result, setResult] = useState<Result>({
     status: 'idle',
     title: 'Ready',
@@ -148,6 +150,7 @@ function App() {
     const reader = new FileReader()
     reader.onload = () => setUploadedImage(String(reader.result))
     reader.readAsDataURL(file)
+    setSourceJobId(null)
   }
 
   async function runBackendJob() {
@@ -172,6 +175,7 @@ function App() {
           attack,
           imageName: uploadName === 'No image selected' ? null : uploadName,
           imageDataUrl: uploadedImage,
+          sourceJobId,
         }),
       })
 
@@ -193,6 +197,7 @@ function App() {
       const payload = await response.json()
       const backendResult = payload.result
       const backendImageUrl = backendResult.image_url ? `${apiBase}${backendResult.image_url}` : null
+      const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
         title: `${selectedMethod.name} backend job complete`,
@@ -202,10 +207,12 @@ function App() {
         notes: backendResult.logs?.join(' ') ?? 'Backend returned a normalized result.',
         imageUrl: backendImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
+        jobId: backendJobId,
       })
       if (backendImageUrl) {
         setUploadedImage(backendImageUrl)
         setUploadName('Generated watermarked image')
+        setSourceJobId(backendJobId)
       }
       return
     } catch (error) {
@@ -231,6 +238,7 @@ function App() {
       runtime: '--',
       notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
       imageUrl: null,
+      jobId: null,
     })
   }
 

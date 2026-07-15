@@ -129,6 +129,7 @@ def normalize_payload(payload: dict) -> dict:
     aliases = {
         "imageName": "image_name",
         "imageDataUrl": "image_data_url",
+        "sourceJobId": "source_job_id",
     }
     normalized = dict(payload)
     for source, target in aliases.items():
