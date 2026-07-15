@@ -41,6 +41,7 @@ type Method = {
 
 type Result = {
   status: 'idle' | 'running' | 'done'
+  workflow: Mode
   title: string
   score: number
   bits: string
@@ -49,6 +50,7 @@ type Result = {
   imageUrl?: string | null
   isError?: boolean
   jobId?: string | null
+  jobNumber?: number | null
 }
 
 type BackendResult = {
@@ -169,6 +171,7 @@ function App() {
   const [selectedJobId, setSelectedJobId] = useState('')
   const [result, setResult] = useState<Result>({
     status: 'idle',
+    workflow: 'generate',
     title: 'Ready',
     score: 0,
     bits: '--',
@@ -219,6 +222,7 @@ function App() {
   async function runBackendJob(workflow: Mode = mode) {
     setResult((current) => ({
       ...current,
+      workflow,
       status: 'running',
       title: 'Submitting backend job',
       notes: `Calling backend at ${apiBase}.`,
@@ -246,6 +250,7 @@ function App() {
         const errorPayload = await response.json().catch(() => ({}))
         setResult({
           status: 'done',
+          workflow,
           title: 'Backend request failed',
           score: 0,
           bits: '--',
@@ -263,6 +268,7 @@ function App() {
       const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
+        workflow,
         title: resultTitle(selectedMethod.name, workflow, backendResult),
         score: backendResult.detection_score,
         bits: backendResult.recovered_payload,
@@ -271,6 +277,7 @@ function App() {
         imageUrl: backendImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
         jobId: backendJobId,
+        jobNumber: backendResult.raw?.job_number ?? null,
       })
       if (backendImageUrl) {
         setUploadedImage(backendImageUrl)
@@ -283,6 +290,7 @@ function App() {
     } catch (error) {
       setResult({
         status: 'done',
+        workflow,
         title: 'Backend not reachable',
         score: 0,
         bits: '--',
@@ -344,6 +352,7 @@ function App() {
   function resetRun() {
     setResult({
       status: 'idle',
+      workflow: mode,
       title: 'Ready',
       score: 0,
       bits: '--',
@@ -351,6 +360,7 @@ function App() {
       notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
       imageUrl: null,
       jobId: null,
+      jobNumber: null,
     })
     setCleanImage(null)
     setSelectedJobId('')
@@ -537,22 +547,45 @@ function App() {
             </div>
 
             <div className="metric-grid">
-              <div className="metric">
-                <span>Detection score</span>
-                <strong>{result.score ? `${result.score}%` : '--'}</strong>
-              </div>
-              <div className="metric">
-                <span>Recovered payload</span>
-                <strong>{result.bits}</strong>
-              </div>
-              <div className="metric">
-                <span>Runtime</span>
-                <strong>{result.runtime}</strong>
-              </div>
-              <div className="metric">
-                <span>Payload type</span>
-                <strong>{selectedMethod.payload}</strong>
-              </div>
+              {result.workflow === 'generate' ? (
+                <>
+                  <div className="metric">
+                    <span>Generation job</span>
+                    <strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Watermark type</span>
+                    <strong>{message}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Runtime</span>
+                    <strong>{result.runtime}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Output</span>
+                    <strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="metric">
+                    <span>Detection score</span>
+                    <strong>{result.score ? `${result.score}%` : '--'}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Recovered payload</span>
+                    <strong>{result.bits}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Runtime</span>
+                    <strong>{result.runtime}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Payload type</span>
+                    <strong>{selectedMethod.payload}</strong>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="quality-bars">
