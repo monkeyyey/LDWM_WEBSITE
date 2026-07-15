@@ -309,6 +309,34 @@ textarea:focus {
   padding: 5px 8px;
 }
 
+.source-job-note {
+  background: #f7f3ec;
+  border: 1px solid #e7ddd0;
+  color: #605446;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+.source-job-note.linked {
+  background: #edf6f2;
+  border-color: #c8dfd5;
+  color: #275246;
+}
+
+.source-job-note strong {
+  color: inherit;
+  font-size: 12px;
+}
+
+.field input:disabled,
+.field select:disabled,
+.field input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .slider-row {
   align-items: center;
   display: grid;

@@ -383,35 +383,45 @@ function App() {
                 <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} />
               </label>
             ) : (
-              <label className="upload-zone primary-upload">
-                <input accept="image/*" onChange={handleUpload} type="file" />
-                <ImageUp size={20} />
-                <span>{uploadName}</span>
-              </label>
+              <>
+                <label className="upload-zone primary-upload">
+                  <input accept="image/*" onChange={handleUpload} type="file" />
+                  <ImageUp size={20} />
+                  <span>{uploadName}</span>
+                </label>
+                <div className={`source-job-note ${sourceJobId ? 'linked' : ''}`}>
+                  <strong>{sourceJobId ? `Linked generation job: ${sourceJobId}` : 'No generation job linked'}</strong>
+                  <span>
+                    {sourceJobId
+                      ? 'Detection will use the saved SFWMark pattern and key from this generated image.'
+                      : 'Generate an SFWMark image first, then switch to Detect without uploading a new file.'}
+                  </span>
+                </div>
+              </>
             )}
 
             <div className="field-row">
               <label className="field">
-                <span>{selectedMethod.messageLabel}</span>
-                <input value={message} onChange={(event) => setMessage(event.target.value)} />
+                <span>{mode === 'detect' ? 'Watermark type metadata' : selectedMethod.messageLabel}</span>
+                <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'} />
               </label>
               <label className="field small-field">
                 <span>Seed</span>
-                <input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" />
+                <input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'} />
               </label>
             </div>
 
             <label className="field">
-              <span>Embedding strength</span>
+              <span>{mode === 'detect' ? 'Embedding strength metadata' : 'Embedding strength'}</span>
               <div className="slider-row">
-                <input value={strength} min={10} max={100} onChange={(event) => setStrength(Number(event.target.value))} type="range" />
+                <input value={strength} min={10} max={100} onChange={(event) => setStrength(Number(event.target.value))} type="range" disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'} />
                 <strong>{strength}</strong>
               </div>
             </label>
 
             <label className="field">
-              <span>Optional robustness test</span>
-              <select value={attack} onChange={(event) => setAttack(event.target.value)}>
+              <span>{mode === 'detect' ? 'Robustness test metadata' : 'Optional robustness test'}</span>
+              <select value={attack} onChange={(event) => setAttack(event.target.value)} disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'}>
                 {selectedMethod.attacks.map((attackName) => (
                   <option key={attackName}>{attackName}</option>
                 ))}
