@@ -525,10 +525,27 @@ function App() {
               <Aperture size={18} />
               <h3>Image Preview</h3>
             </div>
-            <div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>
-              {uploadedImage ? <img src={uploadedImage} alt="Uploaded preview" /> : <div className="latent-grid" />}
-              <span className="stage-badge">{mode === 'detect' ? 'detect uploaded image' : 'generate watermark'}</span>
-            </div>
+            {mode === 'generate' && uploadedImage && cleanImage ? (
+              <div className="comparison-grid" aria-label="Clean and watermarked generated image comparison">
+                <div className="comparison-item">
+                  <div className="image-stage comparison-stage">
+                    <img src={cleanImage} alt="Clean generated baseline" />
+                  </div>
+                  <span>Clean baseline</span>
+                </div>
+                <div className="comparison-item">
+                  <div className="image-stage comparison-stage">
+                    <img src={uploadedImage} alt="Watermarked generated output" />
+                  </div>
+                  <span>Watermarked output</span>
+                </div>
+              </div>
+            ) : (
+              <div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>
+                {uploadedImage ? <img src={uploadedImage} alt="Uploaded preview" /> : <div className="latent-grid" />}
+                <span className="stage-badge">{mode === 'detect' ? 'detect uploaded image' : 'generate watermark'}</span>
+              </div>
+            )}
             <div className="method-detail">
               <strong>{selectedMethod.mechanism}</strong>
               <p>{selectedMethod.bestFor}</p>

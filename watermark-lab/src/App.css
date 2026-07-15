@@ -120,7 +120,7 @@ button {
 
 .workspace {
   margin: 0 auto;
-  max-width: 1220px;
+  max-width: 1440px;
   padding: 30px 28px 42px;
 }
 
@@ -219,7 +219,7 @@ button {
 .main-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(560px, 1.15fr);
 }
 
 .control-panel,
@@ -432,6 +432,27 @@ input[type='range'] {
   height: 100%;
   object-fit: contain;
   width: 100%;
+}
+
+.comparison-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.comparison-item {
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-stage {
+  background: #111827;
+}
+
+.comparison-item span {
+  color: #5f5f59;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .latent-grid {
