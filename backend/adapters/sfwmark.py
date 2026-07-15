@@ -164,6 +164,11 @@ class SfwmarkAdapter(ModelAdapter):
             )
 
         rel_path = image_path.relative_to(self.project_root / "backend" / "storage")
+        clean_path = job_dir / "clean.png"
+        clean_url = None
+        if clean_path.is_file():
+            clean_rel_path = clean_path.relative_to(self.project_root / "backend" / "storage")
+            clean_url = f"/files/{clean_rel_path.as_posix()}"
         return WatermarkResult(
             job_id=job_id,
             method=request.method,
@@ -174,7 +179,7 @@ class SfwmarkAdapter(ModelAdapter):
             runtime="official-sfwmark",
             image_url=f"/files/{rel_path.as_posix()}",
             logs=logs + [f"Generated image: {image_path}"],
-            raw={"wm_type": wm_type},
+            raw={"wm_type": wm_type, "clean_image_url": clean_url},
         )
 
     def _run_official_detect(self, request: WatermarkRequest, job_id: str, job_dir: Path) -> WatermarkResult:

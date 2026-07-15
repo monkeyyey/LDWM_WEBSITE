@@ -67,6 +67,7 @@ type BackendResult = {
     predicted_index?: number
     distance?: number
     source_job_id?: string
+    clean_image_url?: string | null
   }
 }
 
@@ -151,6 +152,7 @@ function App() {
   const [uploadName, setUploadName] = useState('No image selected')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sourceJobId, setSourceJobId] = useState<string | null>(null)
+  const [cleanImage, setCleanImage] = useState<string | null>(null)
   const [result, setResult] = useState<Result>({
     status: 'idle',
     title: 'Ready',
@@ -180,9 +182,10 @@ function App() {
     reader.onload = () => setUploadedImage(String(reader.result))
     reader.readAsDataURL(file)
     setSourceJobId(null)
+    setCleanImage(null)
   }
 
-  async function runBackendJob() {
+  async function runBackendJob(workflow: Mode = mode) {
     setResult((current) => ({
       ...current,
       status: 'running',
@@ -191,7 +194,7 @@ function App() {
     }))
 
     try {
-      const endpoint = mode === 'detect' ? '/detect' : '/watermark/generate'
+      const endpoint = workflow === 'detect' ? '/detect' : '/watermark/generate'
       const response = await fetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -229,11 +232,11 @@ function App() {
       const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
-        title: resultTitle(selectedMethod.name, mode, backendResult),
+        title: resultTitle(selectedMethod.name, workflow, backendResult),
         score: backendResult.detection_score,
         bits: backendResult.recovered_payload,
         runtime: backendResult.runtime,
-        notes: resultSummary(mode, backendResult, backendImageUrl),
+        notes: resultSummary(workflow, backendResult, backendImageUrl),
         imageUrl: backendImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
         jobId: backendJobId,
@@ -242,6 +245,7 @@ function App() {
         setUploadedImage(backendImageUrl)
         setUploadName('Generated watermarked image')
         setSourceJobId(backendJobId)
+        setCleanImage(backendResult.raw?.clean_image_url ? `${fileBase}${backendResult.raw.clean_image_url}` : null)
       }
       return
     } catch (error) {
@@ -256,6 +260,12 @@ function App() {
         isError: true,
       })
     }
+  }
+
+  function detectGeneratedImage() {
+    if (!uploadedImage || !sourceJobId) return
+    setMode('detect')
+    void runBackendJob('detect')
   }
 
   function resultTitle(methodName: string, workflow: Mode, backendResult: BackendResult) {
@@ -299,6 +309,7 @@ function App() {
       imageUrl: null,
       jobId: null,
     })
+    setCleanImage(null)
   }
 
   return (
@@ -345,7 +356,7 @@ function App() {
             <button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run">
               <RotateCcw size={18} />
             </button>
-            <button className="primary-button" onClick={runBackendJob} type="button">
+            <button className="primary-button" onClick={() => runBackendJob()} type="button">
               <Play size={18} />
               Run
             </button>
@@ -495,6 +506,16 @@ function App() {
               <KeyRound size={18} />
               <p>{result.notes}</p>
             </div>
+
+            {mode === 'generate' && selectedMethod.id === 'sfwmark' && uploadedImage && sourceJobId && !result.isError ? (
+              <div className="result-actions">
+                <button className="secondary-button" onClick={detectGeneratedImage} type="button">
+                  <ShieldCheck size={18} />
+                  Detect this image
+                </button>
+                {cleanImage ? <a href={cleanImage} target="_blank" rel="noreferrer">Open clean baseline</a> : null}
+              </div>
+            ) : null}
           </div>
         </section>
       </section>
