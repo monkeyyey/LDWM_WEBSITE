@@ -355,7 +355,7 @@ textarea:focus {
   aspect-ratio: 1;
   background: #111827;
   height: 72px;
-  object-fit: cover;
+  object-fit: contain;
   width: 72px;
 }
 
@@ -420,9 +420,9 @@ input[type='range'] {
 }
 
 .image-stage {
-  aspect-ratio: 1.35 / 1;
+  aspect-ratio: 1 / 1;
   display: grid;
-  min-height: 308px;
+  min-height: 0;
   overflow: hidden;
   place-items: center;
   position: relative;
