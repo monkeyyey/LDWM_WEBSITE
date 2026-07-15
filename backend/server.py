@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from job_store import list_sfwmark_jobs
 from registry import MethodRegistry
 from runtimes.sfwmark_lite import runtime_report
 from schemas import WatermarkRequest
@@ -35,6 +36,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if path == "/runtime":
             self._json({"runtime": runtime_report()})
+            return
+        if path == "/jobs":
+            self._json({"jobs": list_sfwmark_jobs(PROJECT_ROOT)})
             return
         if path.startswith("/files/"):
             self._serve_storage_file(path)

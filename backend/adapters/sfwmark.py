@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from schemas import WatermarkRequest, WatermarkResult
 
 from .base import ModelAdapter
+from job_store import assign_job_number
 from runtimes import sfwmark_lite
 
 
@@ -169,6 +170,7 @@ class SfwmarkAdapter(ModelAdapter):
         if clean_path.is_file():
             clean_rel_path = clean_path.relative_to(self.project_root / "backend" / "storage")
             clean_url = f"/files/{clean_rel_path.as_posix()}"
+        job_number = assign_job_number(self.project_root, job_id, job_dir)
         return WatermarkResult(
             job_id=job_id,
             method=request.method,
@@ -179,7 +181,7 @@ class SfwmarkAdapter(ModelAdapter):
             runtime="official-sfwmark",
             image_url=f"/files/{rel_path.as_posix()}",
             logs=logs + [f"Generated image: {image_path}"],
-            raw={"wm_type": wm_type, "clean_image_url": clean_url},
+            raw={"wm_type": wm_type, "clean_image_url": clean_url, "job_number": job_number},
         )
 
     def _run_official_detect(self, request: WatermarkRequest, job_id: str, job_dir: Path) -> WatermarkResult:

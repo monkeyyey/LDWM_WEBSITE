@@ -337,6 +337,51 @@ textarea:focus {
   opacity: 0.62;
 }
 
+.previous-job-field {
+  margin-top: 2px;
+}
+
+.previous-job-preview {
+  align-items: center;
+  border: 1px solid #eeeeea;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 72px 1fr;
+  min-height: 86px;
+  padding: 8px;
+}
+
+.previous-job-preview img {
+  aspect-ratio: 1;
+  background: #111827;
+  height: 72px;
+  object-fit: cover;
+  width: 72px;
+}
+
+.previous-job-preview div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.previous-job-preview strong,
+.previous-job-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previous-job-preview strong {
+  color: #20201d;
+  font-size: 13px;
+}
+
+.previous-job-preview span {
+  color: #77756d;
+  font-size: 12px;
+}
+
 .slider-row {
   align-items: center;
   display: grid;

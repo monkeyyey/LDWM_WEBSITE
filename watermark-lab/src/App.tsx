@@ -68,7 +68,19 @@ type BackendResult = {
     distance?: number
     source_job_id?: string
     clean_image_url?: string | null
+    job_number?: number
   }
+}
+
+type JobSummary = {
+  job_id: string
+  job_number?: number
+  label: string
+  prompt: string
+  wm_type: string
+  created_at?: string
+  image_url: string
+  clean_image_url?: string | null
 }
 
 const methods: Method[] = [
@@ -153,6 +165,8 @@ function App() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sourceJobId, setSourceJobId] = useState<string | null>(null)
   const [cleanImage, setCleanImage] = useState<string | null>(null)
+  const [jobs, setJobs] = useState<JobSummary[]>([])
+  const [selectedJobId, setSelectedJobId] = useState('')
   const [result, setResult] = useState<Result>({
     status: 'idle',
     title: 'Ready',
@@ -172,6 +186,23 @@ function App() {
     setMessage(selectedMethod.defaultMessage)
     setAttack(selectedMethod.attacks[0])
   }, [selectedMethod])
+
+  useEffect(() => {
+    if (mode === 'detect' && selectedMethod.id === 'sfwmark') {
+      void loadJobs()
+    }
+  }, [mode, selectedMethod.id])
+
+  async function loadJobs() {
+    try {
+      const response = await fetch(`${apiBase}/jobs`)
+      if (!response.ok) return
+      const payload = await response.json()
+      setJobs(payload.jobs ?? [])
+    } catch {
+      setJobs([])
+    }
+  }
 
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -245,6 +276,7 @@ function App() {
         setUploadedImage(backendImageUrl)
         setUploadName('Generated watermarked image')
         setSourceJobId(backendJobId)
+        setSelectedJobId(backendJobId ?? '')
         setCleanImage(backendResult.raw?.clean_image_url ? `${fileBase}${backendResult.raw.clean_image_url}` : null)
       }
       return
@@ -266,6 +298,17 @@ function App() {
     if (!uploadedImage || !sourceJobId) return
     setMode('detect')
     void runBackendJob('detect')
+  }
+
+  function selectPreviousJob(jobId: string) {
+    setSelectedJobId(jobId)
+    const job = jobs.find((item) => item.job_id === jobId)
+    if (!job) return
+    setUploadedImage(`${fileBase}${job.image_url}`)
+    setCleanImage(job.clean_image_url ? `${fileBase}${job.clean_image_url}` : null)
+    setSourceJobId(job.job_id)
+    setUploadName(`Previous ${job.label}`)
+    setMessage(job.wm_type)
   }
 
   function resultTitle(methodName: string, workflow: Mode, backendResult: BackendResult) {
@@ -310,6 +353,7 @@ function App() {
       jobId: null,
     })
     setCleanImage(null)
+    setSelectedJobId('')
   }
 
   return (
@@ -408,6 +452,26 @@ function App() {
                       : 'Generate an SFWMark image first, then switch to Detect without uploading a new file.'}
                   </span>
                 </div>
+                <label className="field previous-job-field">
+                  <span>Choose previous generated job</span>
+                  <select value={selectedJobId} onChange={(event) => selectPreviousJob(event.target.value)}>
+                    <option value="">Select a saved SFWMark job</option>
+                    {jobs.map((job) => (
+                      <option key={job.job_id} value={job.job_id}>
+                        {job.label} · {job.prompt || job.job_id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {sourceJobId && uploadedImage ? (
+                  <div className="previous-job-preview">
+                    <img src={uploadedImage} alt="Selected previous watermarked output" />
+                    <div>
+                      <strong>{jobs.find((job) => job.job_id === sourceJobId)?.label ?? `Job ${sourceJobId}`}</strong>
+                      <span>{jobs.find((job) => job.job_id === sourceJobId)?.prompt ?? 'Generated SFWMark image'}</span>
+                    </div>
+                  </div>
+                ) : null}
               </>
             )}
 
