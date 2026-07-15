@@ -93,14 +93,18 @@ def main() -> int:
 
 def patch_generate_model_id(generate_py: Path, model_id: str) -> None:
     source = generate_py.read_text(encoding="utf-8")
+    match = re.search(r'model_id\s*=\s*"([^"]+)"', source)
+    if not match:
+        raise RuntimeError(f"Could not find model_id in {generate_py}")
+    if match.group(1) == model_id:
+        return
+
     patched = re.sub(
         r'model_id\s*=\s*"[^"]+"',
         f'model_id = "{model_id}"',
         source,
         count=1,
     )
-    if patched == source:
-        raise RuntimeError(f"Could not patch model_id in {generate_py}")
     generate_py.write_text(patched, encoding="utf-8")
 
 
