@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,9 @@ def main() -> int:
         return 2
 
     src_dir = sfw_dir / "src"
+    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-base")
+    patch_generate_model_id(src_dir / "generate.py", model_id)
+
     dataset_dir = src_dir / "text_dataset" / "DiffusionDB"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = dataset_dir / "metadata_1k.json"
@@ -74,6 +78,7 @@ def main() -> int:
                 "sfwmark_repo": str(sfw_dir),
                 "prompt": args.prompt,
                 "wm_type": args.wm_type,
+                "model_id": model_id,
                 "dataset_id": "DB1k",
                 "source_image": str(generated),
                 "clean_image": str(clean) if clean.is_file() else None,
@@ -84,6 +89,19 @@ def main() -> int:
     )
     print(job_dir / "watermarked.png")
     return 0
+
+
+def patch_generate_model_id(generate_py: Path, model_id: str) -> None:
+    source = generate_py.read_text(encoding="utf-8")
+    patched = re.sub(
+        r'model_id\s*=\s*"[^"]+"',
+        f'model_id = "{model_id}"',
+        source,
+        count=1,
+    )
+    if patched == source:
+        raise RuntimeError(f"Could not patch model_id in {generate_py}")
+    generate_py.write_text(patched, encoding="utf-8")
 
 
 if __name__ == "__main__":

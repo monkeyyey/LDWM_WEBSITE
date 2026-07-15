@@ -106,7 +106,9 @@ const methods: Method[] = [
 
 const seedPreview =
   'linear-gradient(135deg, #f4efe4 0%, #dce9e2 36%, #9eb6c6 68%, #2f3a4a 100%)'
-const apiBase = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
+const apiBase =
+  import.meta.env.VITE_API_BASE ??
+  `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8000`
 
 function App() {
   const [mode, setMode] = useState<Mode>('generate')
@@ -124,7 +126,7 @@ function App() {
     score: 0,
     bits: '--',
     runtime: '--',
-    notes: 'Run a local mock job to preview the full workflow before connecting GPU workers.',
+    notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
     imageUrl: null,
   })
 
@@ -148,12 +150,12 @@ function App() {
     reader.readAsDataURL(file)
   }
 
-  async function runMockJob() {
+  async function runBackendJob() {
     setResult((current) => ({
       ...current,
       status: 'running',
       title: 'Submitting backend job',
-      notes: 'Calling the unified backend. If it is offline, the browser mock will run instead.',
+      notes: `Calling backend at ${apiBase}.`,
     }))
 
     try {
@@ -206,27 +208,17 @@ function App() {
         setUploadName('Generated watermarked image')
       }
       return
-    } catch {
-      window.setTimeout(() => {
-      const scoreBase = selectedMethod.robustness - (attack === 'None' ? 0 : 7)
-      const generatedBits =
-        selectedMethod.id === 'gaussian-shannon'
-          ? '1011 0010 1100 0111'
-          : selectedMethod.id === 'lawa'
-            ? '48-bit mark matched'
-            : 'keyed pattern present'
-
+    } catch (error) {
       setResult({
         status: 'done',
-      title: `${selectedMethod.name} ${mode === 'detect' ? 'detection' : 'generation'} complete`,
-        score: Math.max(55, Math.min(99, scoreBase + Math.round(strength / 12))),
-        bits: generatedBits,
-        runtime: selectedMethod.latency === 'High' ? '39.4s' : selectedMethod.latency === 'Medium' ? '22.8s' : '11.6s',
-        notes:
-          'Backend was not reachable, so this is frontend-only mock output.',
+        title: 'Backend not reachable',
+        score: 0,
+        bits: '--',
+        runtime: '--',
+        notes: `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase} and AWS security group allows port 8000.`,
         imageUrl: null,
+        isError: true,
       })
-      }, 850)
     }
   }
 
@@ -237,7 +229,7 @@ function App() {
       score: 0,
       bits: '--',
       runtime: '--',
-      notes: 'Run a local mock job to preview the full workflow before connecting GPU workers.',
+      notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
       imageUrl: null,
     })
   }
@@ -286,7 +278,7 @@ function App() {
             <button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run">
               <RotateCcw size={18} />
             </button>
-            <button className="primary-button" onClick={runMockJob} type="button">
+            <button className="primary-button" onClick={runBackendJob} type="button">
               <Play size={18} />
               Run
             </button>

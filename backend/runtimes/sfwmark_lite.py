@@ -80,7 +80,7 @@ def generate(prompt: str, message: str, seed: int, output_dir: Path) -> LiteResu
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-1-base")
+    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-base")
     dtype = torch.float16
     logs = [
         "Running real SFWMark-lite generation.",
@@ -183,7 +183,7 @@ def detect(image_path: Path, message: str, seed: int, output_dir: Path) -> LiteR
             raw={"device": device},
         )
 
-    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-1-base")
+    model_id = os.environ.get("SFW_MODEL_ID", "stabilityai/stable-diffusion-2-base")
     dtype = torch.float16
     try:
         scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
