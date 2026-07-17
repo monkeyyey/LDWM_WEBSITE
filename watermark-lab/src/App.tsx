@@ -85,7 +85,7 @@ type JobSummary = {
   clean_image_url?: string | null
 }
 
-const sfwmarkTypes = ['HSQR', 'HSTR', 'Tree-Ring', 'RingID']
+const sfwmarkTypes = ['HSQR', 'HSTR', 'RingID']
 
 const methods: Method[] = [
   {
@@ -102,7 +102,7 @@ const methods: Method[] = [
     color: '#136f63',
     messageLabel: 'Watermark type',
     defaultMessage: 'HSQR',
-    repoDefaults: ['wm_type: HSQR | HSTR | Tree-Ring | RingID', 'dataset_id: DB1k web prompt', 'detect: saved job artifacts'],
+    repoDefaults: ['validated wm_type: HSQR | HSTR | RingID', 'Tree-Ring: generate-only experimental', 'detect: saved job artifacts'],
     attacks: ['None', 'JPEG', 'Diffusion', 'Center crop (CC)', 'Random crop (RC)', 'Blur', 'Noise', 'Brightness', 'Contrast'],
   },
   {
