@@ -434,27 +434,6 @@ input[type='range'] {
   width: 100%;
 }
 
-.comparison-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.comparison-item {
-  display: grid;
-  gap: 8px;
-}
-
-.comparison-stage {
-  background: #111827;
-}
-
-.comparison-item span {
-  color: #5f5f59;
-  font-size: 12px;
-  font-weight: 750;
-}
-
 .latent-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1px),

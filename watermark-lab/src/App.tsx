@@ -168,7 +168,6 @@ function App() {
   const [uploadName, setUploadName] = useState('No image selected')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sourceJobId, setSourceJobId] = useState<string | null>(null)
-  const [cleanImage, setCleanImage] = useState<string | null>(null)
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [result, setResult] = useState<Result>({
@@ -218,7 +217,6 @@ function App() {
     reader.onload = () => setUploadedImage(String(reader.result))
     reader.readAsDataURL(file)
     setSourceJobId(null)
-    setCleanImage(null)
   }
 
   async function runBackendJob(workflow: Mode = mode) {
@@ -286,7 +284,6 @@ function App() {
         setUploadName('Generated watermarked image')
         setSourceJobId(backendJobId)
         setSelectedJobId(backendJobId ?? '')
-        setCleanImage(backendResult.raw?.clean_image_url ? `${fileBase}${backendResult.raw.clean_image_url}` : null)
       }
       return
     } catch (error) {
@@ -315,7 +312,6 @@ function App() {
     const job = jobs.find((item) => item.job_id === jobId)
     if (!job) return
     setUploadedImage(`${fileBase}${job.image_url}`)
-    setCleanImage(job.clean_image_url ? `${fileBase}${job.clean_image_url}` : null)
     setSourceJobId(job.job_id)
     setUploadName(`Previous ${job.label}`)
     setMessage(job.wm_type)
@@ -364,7 +360,6 @@ function App() {
       jobId: null,
       jobNumber: null,
     })
-    setCleanImage(null)
     setSelectedJobId('')
   }
 
@@ -535,27 +530,10 @@ function App() {
               <Aperture size={18} />
               <h3>Image Preview</h3>
             </div>
-            {mode === 'generate' && uploadedImage && cleanImage ? (
-              <div className="comparison-grid" aria-label="Clean and watermarked generated image comparison">
-                <div className="comparison-item">
-                  <div className="image-stage comparison-stage">
-                    <img src={cleanImage} alt="Clean generated baseline" />
-                  </div>
-                  <span>Clean baseline</span>
-                </div>
-                <div className="comparison-item">
-                  <div className="image-stage comparison-stage">
-                    <img src={uploadedImage} alt="Watermarked generated output" />
-                  </div>
-                  <span>Watermarked output</span>
-                </div>
-              </div>
-            ) : (
-              <div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>
-                {uploadedImage ? <img src={uploadedImage} alt="Uploaded preview" /> : <div className="latent-grid" />}
-                <span className="stage-badge">{mode === 'detect' ? 'detect uploaded image' : 'generate watermark'}</span>
-              </div>
-            )}
+            <div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>
+              {uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded preview" /> : <div className="latent-grid" />}
+              <span className="stage-badge">{mode === 'detect' ? 'detect image' : 'generated watermarked image'}</span>
+            </div>
             <div className="method-detail">
               <strong>{selectedMethod.mechanism}</strong>
               <p>{selectedMethod.bestFor}</p>
@@ -637,7 +615,6 @@ function App() {
                   <ShieldCheck size={18} />
                   Detect this image
                 </button>
-                {cleanImage ? <a href={cleanImage} target="_blank" rel="noreferrer">Open clean baseline</a> : null}
               </div>
             ) : null}
           </div>
