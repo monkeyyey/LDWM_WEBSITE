@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowRight,
   Aperture,
   Binary,
   CheckCircle2,
@@ -537,8 +538,11 @@ function App() {
                   <p>Backend samples Gaussian latent noise, then inserts the watermark in Fourier latent space.</p>
                 </div>
                 <div className="workflow-chain" aria-label="SFWMark latent workflow">
-                  {sfwmarkWorkflow.map((step) => (
-                    <span key={step}>{step}</span>
+                  {sfwmarkWorkflow.map((step, index) => (
+                    <div className="workflow-item" key={step}>
+                      <span className="workflow-step">{step}</span>
+                      {index < sfwmarkWorkflow.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}
+                    </div>
                   ))}
                 </div>
               </section>

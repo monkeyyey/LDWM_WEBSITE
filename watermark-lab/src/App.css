@@ -345,19 +345,40 @@ textarea:focus {
 }
 
 .workflow-chain {
+  align-items: stretch;
   border-top: 1px solid #edf2ef;
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  gap: 0;
+  overflow-x: auto;
   padding-top: 12px;
 }
 
-.workflow-chain span {
+.workflow-item {
+  align-items: center;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 112px;
+}
+
+.workflow-step {
   background: #edf6f2;
+  border: 1px solid #c8dfd5;
   color: #275246;
-  margin: 0;
-  padding: 5px 7px;
+  display: flex;
+  flex: 1;
+  font-size: 12px;
+  justify-content: center;
+  line-height: 1.25;
+  min-height: 48px;
+  padding: 8px 9px;
+  text-align: center;
   text-transform: none;
+}
+
+.workflow-arrow {
+  color: #679688;
+  flex: 0 0 16px;
+  margin: 0 5px;
 }
 
 .source-job-note {
@@ -674,5 +695,24 @@ progress {
 
   .result-panel {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .workflow-chain {
+    display: grid;
+    overflow-x: visible;
+  }
+
+  .workflow-item {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .workflow-arrow {
+    justify-self: center;
+    margin: 0;
+    transform: rotate(90deg);
   }
 }
