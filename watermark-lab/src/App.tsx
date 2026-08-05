@@ -4,6 +4,7 @@ import {
   Binary,
   CheckCircle2,
   Cloud,
+  Download,
   Gauge,
   ImageUp,
   KeyRound,
@@ -48,6 +49,7 @@ type Result = {
   runtime: string
   notes: string
   imageUrl?: string | null
+  cleanImageUrl?: string | null
   isError?: boolean
   jobId?: string | null
   jobNumber?: number | null
@@ -86,6 +88,20 @@ type JobSummary = {
 }
 
 const sfwmarkTypes = ['HSQR', 'HSTR', 'RingID']
+const sfwmarkDescriptions: Record<string, string> = {
+  HSQR: 'QR-like Fourier sign pattern embedded into selected latent frequency slots.',
+  HSTR: 'Hermitian symmetric tree-ring pattern embedded in the center latent region.',
+  RingID: 'Ring-frequency identity watermark that maps a key to Fourier ring values.',
+}
+const sfwmarkWorkflow = [
+  'Prompt',
+  'Gaussian latent noise, 1 x 4 x 64 x 64',
+  'Fourier watermark insertion',
+  'Stable Diffusion generation',
+  'Watermarked image',
+  'DDIM inversion',
+  'Watermark extraction',
+]
 
 const methods: Method[] = [
   {
@@ -179,12 +195,14 @@ function App() {
     runtime: '--',
     notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
     imageUrl: null,
+    cleanImageUrl: null,
   })
 
   const selectedMethod = useMemo(
     () => methods.find((method) => method.id === methodId) ?? methods[0],
     [methodId],
   )
+  const showStrengthControl = selectedMethod.id !== 'sfwmark'
 
   useEffect(() => {
     setMessage(selectedMethod.defaultMessage)
@@ -238,7 +256,7 @@ function App() {
           prompt,
           message,
           seed,
-          strength,
+          strength: showStrengthControl ? strength : undefined,
           attack,
           imageName: uploadName === 'No image selected' ? null : uploadName,
           imageDataUrl: uploadedImage,
@@ -265,6 +283,7 @@ function App() {
       const payload = await response.json()
       const backendResult = payload.result as BackendResult
       const backendImageUrl = backendResult.image_url ? `${fileBase}${backendResult.image_url}` : null
+      const cleanImageUrl = backendResult.raw?.clean_image_url ? `${fileBase}${backendResult.raw.clean_image_url}` : null
       const backendJobId = backendResult.job_id ?? null
       setResult({
         status: 'done',
@@ -275,6 +294,7 @@ function App() {
         runtime: backendResult.runtime,
         notes: resultSummary(workflow, backendResult, backendImageUrl),
         imageUrl: backendImageUrl,
+        cleanImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required',
         jobId: backendJobId,
         jobNumber: backendResult.raw?.job_number ?? null,
@@ -296,6 +316,7 @@ function App() {
         runtime: '--',
         notes: `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase} and AWS security group allows port 8000.`,
         imageUrl: null,
+        cleanImageUrl: null,
         isError: true,
       })
     }
@@ -318,10 +339,11 @@ function App() {
   }
 
   function resultTitle(methodName: string, workflow: Mode, backendResult: BackendResult) {
+    const workflowLabel = workflow === 'detect' ? 'extraction' : 'generation'
     if (backendResult.status === 'failed' || backendResult.status === 'setup_required') {
-      return `${methodName} ${workflow} failed`
+      return `${methodName} ${workflowLabel} failed`
     }
-    return workflow === 'generate' ? `${methodName} generation complete` : `${methodName} detection complete`
+    return workflow === 'generate' ? `${methodName} generation complete` : `${methodName} extraction complete`
   }
 
   function resultSummary(workflow: Mode, backendResult: BackendResult, imageUrl: string | null) {
@@ -332,7 +354,7 @@ function App() {
     const wmType = backendResult.raw?.wm_type ?? message
     if (workflow === 'generate') {
       return imageUrl
-        ? `${wmType} watermarked image generated and ready for detection.`
+        ? `${wmType} watermarked image generated and ready for extraction.`
         : `${wmType} generation completed.`
     }
 
@@ -342,9 +364,9 @@ function App() {
       return `Watermark matched key ${raw.key_index}. Distance: ${distance}.`
     }
     if (raw) {
-      return `Watermark did not match. Expected key ${raw.key_index}, predicted ${raw.predicted_index}.`
+      return `Watermark was not extracted. Expected key ${raw.key_index}, predicted ${raw.predicted_index}.`
     }
-    return backendResult.recovered_payload || 'Detection completed.'
+    return backendResult.recovered_payload || 'Extraction completed.'
   }
 
   function resetRun() {
@@ -357,6 +379,7 @@ function App() {
       runtime: '--',
       notes: 'Run a backend job. SFWMark generation requires the AWS CUDA backend to be reachable.',
       imageUrl: null,
+      cleanImageUrl: null,
       jobId: null,
       jobNumber: null,
     })
@@ -380,7 +403,7 @@ function App() {
         <nav className="mode-tabs" aria-label="Workflow mode">
           <button className={mode === 'detect' ? 'active' : ''} onClick={() => setMode('detect')} type="button">
             <Upload size={18} />
-            Detect Uploaded Image
+            Extract Watermark
           </button>
           <button className={mode === 'generate' ? 'active' : ''} onClick={() => setMode('generate')} type="button">
             <Sparkles size={18} />
@@ -401,7 +424,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Prototype dashboard</p>
-            <h2>Generate latent watermarked images and evaluate uploaded outputs</h2>
+            <h2>Generate latent watermarked images and extract SFWMark outputs</h2>
           </div>
           <div className="run-controls">
             <button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run">
@@ -436,7 +459,7 @@ function App() {
           <div className="control-panel">
             <div className="section-heading">
               <SlidersHorizontal size={18} />
-              <h3>{mode === 'detect' ? 'Detection Workflow' : 'Generation Workflow'}</h3>
+              <h3>{mode === 'detect' ? 'Extraction Workflow' : 'Generation Workflow'}</h3>
             </div>
 
             {mode === 'generate' ? (
@@ -455,8 +478,8 @@ function App() {
                   <strong>{sourceJobId ? `Linked generation job: ${sourceJobId}` : 'No generation job linked'}</strong>
                   <span>
                     {sourceJobId
-                      ? 'Detection will use the saved SFWMark pattern and key from this generated image.'
-                      : 'Generate an SFWMark image first, then switch to Detect without uploading a new file.'}
+                      ? 'Extraction will use the saved SFWMark pattern and key from this generated image.'
+                      : 'Generate an SFWMark image first, then switch to Extract without uploading a new file.'}
                   </span>
                 </div>
                 <label className="field previous-job-field">
@@ -501,13 +524,35 @@ function App() {
               </label>
             </div>
 
-            <label className="field">
-              <span>{mode === 'detect' ? 'Embedding strength metadata' : 'Embedding strength'}</span>
-              <div className="slider-row">
-                <input value={strength} min={10} max={100} onChange={(event) => setStrength(Number(event.target.value))} type="range" disabled={mode === 'detect' && selectedMethod.id === 'sfwmark'} />
-                <strong>{strength}</strong>
-              </div>
-            </label>
+            {selectedMethod.id === 'sfwmark' ? (
+              <section className="method-explainer" aria-label="SFWMark explanation">
+                <div>
+                  <span>Selected variant</span>
+                  <strong>{message}</strong>
+                  <p>{sfwmarkDescriptions[message]}</p>
+                </div>
+                <div className="latent-facts">
+                  <span>Latent shape</span>
+                  <strong>1 x 4 x 64 x 64</strong>
+                  <p>Backend samples Gaussian latent noise, then inserts the watermark in Fourier latent space.</p>
+                </div>
+                <div className="workflow-chain" aria-label="SFWMark latent workflow">
+                  {sfwmarkWorkflow.map((step) => (
+                    <span key={step}>{step}</span>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {showStrengthControl ? (
+              <label className="field">
+                <span>{mode === 'detect' ? 'Embedding strength metadata' : 'Embedding strength'}</span>
+                <div className="slider-row">
+                  <input value={strength} min={10} max={100} onChange={(event) => setStrength(Number(event.target.value))} type="range" />
+                  <strong>{strength}</strong>
+                </div>
+              </label>
+            ) : null}
 
             <label className="field">
               <span>{mode === 'detect' ? 'Robustness test metadata' : 'Optional robustness test'}</span>
@@ -532,7 +577,7 @@ function App() {
             </div>
             <div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>
               {uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded preview" /> : <div className="latent-grid" />}
-              <span className="stage-badge">{mode === 'detect' ? 'detect image' : 'generated watermarked image'}</span>
+              <span className="stage-badge">{mode === 'detect' ? 'extract image' : 'generated watermarked image'}</span>
             </div>
             <div className="method-detail">
               <strong>{selectedMethod.mechanism}</strong>
@@ -574,11 +619,11 @@ function App() {
               ) : (
                 <>
                   <div className="metric">
-                    <span>Detection score</span>
+                    <span>Extraction score</span>
                     <strong>{result.score ? `${result.score}%` : '--'}</strong>
                   </div>
                   <div className="metric">
-                    <span>Recovered payload</span>
+                    <span>Extracted watermark</span>
                     <strong>{result.bits}</strong>
                   </div>
                   <div className="metric">
@@ -613,8 +658,20 @@ function App() {
               <div className="result-actions">
                 <button className="secondary-button" onClick={detectGeneratedImage} type="button">
                   <ShieldCheck size={18} />
-                  Detect this image
+                  Extract from this image
                 </button>
+                {result.imageUrl ? (
+                  <a className="download-link" href={result.imageUrl} download>
+                    <Download size={18} />
+                    Download watermarked image
+                  </a>
+                ) : null}
+                {result.cleanImageUrl ? (
+                  <a className="download-link" href={result.cleanImageUrl} download>
+                    <Download size={18} />
+                    Download clean image
+                  </a>
+                ) : null}
               </div>
             ) : null}
           </div>

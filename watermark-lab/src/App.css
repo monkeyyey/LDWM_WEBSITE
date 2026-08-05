@@ -309,6 +309,57 @@ textarea:focus {
   padding: 5px 8px;
 }
 
+.method-explainer {
+  border: 1px solid #dfe9e4;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.method-explainer span {
+  color: #5f5f59;
+  display: block;
+  font-size: 12px;
+  font-weight: 750;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.method-explainer strong {
+  color: #171717;
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.method-explainer p {
+  color: #5f5f59;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 5px 0 0;
+}
+
+.latent-facts {
+  border-top: 1px solid #edf2ef;
+  padding-top: 12px;
+}
+
+.workflow-chain {
+  border-top: 1px solid #edf2ef;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 12px;
+}
+
+.workflow-chain span {
+  background: #edf6f2;
+  color: #275246;
+  margin: 0;
+  padding: 5px 7px;
+  text-transform: none;
+}
+
 .source-job-note {
   background: #f7f3ec;
   border: 1px solid #e7ddd0;
@@ -575,11 +626,21 @@ progress {
   padding: 0 14px;
 }
 
-.result-actions a {
-  color: #315f9f;
-  font-size: 13px;
-  font-weight: 700;
+.download-link {
+  align-items: center;
+  border: 1px solid #d7d7d0;
+  color: #171717;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 750;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
   text-decoration: none;
+}
+
+.download-link:hover {
+  border-color: #171717;
 }
 
 @media (max-width: 900px) {
