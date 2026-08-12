@@ -1,107 +1,70 @@
-# Repository Alignment Notes
+# Repository Alignment
 
-This file records what the current website/backend assumes about the three first-pass model integrations.
+The application is an aggregation layer, not a replacement implementation.
+Each adapter calls the corresponding upstream repository or a thin runner that
+imports its functions and preserves its data flow.
 
 ## SFWMark
 
-Repo: `work/repos/SFWMark`
+Repository: `work/repos/SFWMark`
 
-Native behavior:
+- Generation starts from Gaussian latent noise shaped `1 x 4 x 64 x 64`, inserts
+  the selected Fourier pattern, and runs Stable Diffusion.
+- Verification uses DDIM inversion and distance to the known ground-truth
+  pattern. The original repository uses this distance in ROC evaluation.
+- Identification computes distances to the 2048-pattern bank, chooses the
+  closest candidate, and only then compares it with the stored ground-truth
+  index for accuracy.
+- The website exposes the fully wired `HSQR` and `HSTR` variants. Tree-Ring and
+  RingID are not part of this app's SFWMark selection.
 
-- Generation-time latent-noise watermarking.
-- Detection through DDIM inversion and Fourier-domain analysis.
-- Robustness evaluation with attacks including JPEG, Diffusion, center crop (`CC`), random crop (`RC`), blur, noise, brightness, and contrast.
+The browser shows only the watermarked output. The generation job retains the
+pattern bank and ground-truth index required for later analysis.
 
-Important repo config:
+## Gaussian-Shannon
 
-- `python src/generate.py --wm_type HSQR --dataset_id coco`
-- `wm_type` options: `Tree-Ring`, `RingID`, `HSTR`, `HSQR`
-- `dataset_id` options: `coco`, `Gustavo`, `DB1k`
+Repository: `work/repos/Gaussian-Shannon`
 
-Website alignment:
+- Generation uses the repository's Gaussian or LDPC coding functions, embeds
+  the coded bits into the diffusion latent, and generates an image.
+- Verification is represented by inversion, extraction, and comparison with
+  the supplied 256-bit message.
+- The repository reports bit error rate rather than a candidate-key identity.
+- Its robustness helpers remain available as a secondary attack workflow.
 
-- Uses SFWMark as a Fourier latent watermark method.
-- Exposes `wm_type` as the payload/config field.
-- Does not claim arbitrary uploaded-image watermark embedding.
-
-## Gaussian Shannon
-
-Repo: `work/repos/Gaussian-Shannon`
-
-Native behavior:
-
-- Generation-time latent watermarking based on communication coding.
-- DDIM inversion and decoding for detection.
-- Robustness helpers for JPEG, blur, noise, crop, random drop, SDEdit, and adversarial embedding-space attack.
-
-Important repo config:
-
-- Default model: `stabilityai/stable-diffusion-2-1`
-- Message length in code: `256` bits
-- Common redundancy value: `64`
-- Code is function-oriented in `infer.py` rather than a polished end-user CLI.
-
-Website alignment:
-
-- Uses Gaussian Shannon as the exact/recoverable bit-payload representative.
-- Labels payload as a 256-bit mode, not arbitrary short text.
-- Adapter should wrap `infer.py` functions or add a thin CLI before production use.
+The adapter runner calls the repository's `gauss_encode`, `ldpc_encode`,
+`watermarkToLatents`, `latentsToWatermark`, and decoder functions.
 
 ## LaWa
 
-Repo: `work/repos/LaWa`
+Repository: `work/repos/LaWa`
 
-Native behavior:
+- Generation calls the original `inference_AIGC.py` with the pretrained 48-bit
+  message configuration.
+- Verification uses the modified decoder to extract 48 bits and reports bit
+  accuracy and bit error rate.
+- The repository has no candidate-bank identification procedure.
+- Its attack and quality workflows are secondary evaluations, not new
+  watermarking algorithms.
 
-- In-generation image watermarking with Stable Diffusion v1.4 and a modified decoder.
-- Uses pretrained weights for a 48-bit binary watermark.
-- Generates original, watermarked, difference image, quality CSV, and attack CSV.
+The extraction runner loads the same LaWa model and calls its `model.decoder`
+path. It does not claim arbitrary-image watermark embedding.
 
-Important repo config:
+## Product Boundary
 
-- `python inference_AIGC.py --config configs/SD14_LaWa_inference.yaml --message_len 48 --message <48 bits>`
-- Modified decoder: `weights/LaWa/last.ckpt`
-- First-stage autoencoder: `weights/first_stage_models/first_stage_KL-f8.ckpt`
-- Stable Diffusion checkpoint: `weights/stable-diffusion-v1/model.ckpt`
-- Default generation resolution: `512x512`
-- Default sampling: `ddim_steps=50`
-
-Website alignment:
-
-- Uses LaWa as the VAE/decoder-integrated latent watermark representative.
-- Enforces the concept of a 48-bit binary message in the UI text/default.
-- Does not claim arbitrary uploaded-image watermark embedding.
-
-## Key Product Constraint
-
-For these three repos, the reliable first product workflow is:
+These repositories watermark during generation. The shared app therefore
+supports:
 
 ```text
-generate watermarked image -> optionally attack/edit -> detect/evaluate watermark
+prompt -> repository-native watermark generation -> watermarked image
+       -> repository-native verification or identification
 ```
 
-The workflow:
+It does not offer a generic post-hoc operation that takes an arbitrary image and
+adds a watermark. No clean comparison image is returned or downloadable.
 
-```text
-upload arbitrary image -> embed watermark into that image
-```
+## Runtime Truthfulness
 
-is not natively supported by all three selected repos and should not be presented as a guaranteed capability unless a custom post-hoc adapter is built.
-
-## Confirmation Implementation Status
-
-The backend adapters now expose a `command_plan()` for each method. In normal mode the server returns mock results plus the real command/function plan. If the correct repo environment, model weights, and GPU are available, setting:
-
-```bash
-WATERMARK_EXECUTE_REAL=1
-```
-
-before starting `backend/server.py` makes adapters attempt to execute their command plan.
-
-This is intentionally off by default because these commands require repo-specific conda/Docker environments and large model checkpoints.
-
-Current adapter readiness:
-
-- `SFWMark`: has native `generate.py` and `detect.py`; easiest to make fully real first.
-- `Gaussian Shannon`: has generation/detection functions in `infer.py`, but not a polished CLI; adapter calls Python functions through a small inline wrapper.
-- `LaWa`: has generation plus immediate extraction/attack CSVs in `inference_AIGC.py`; standalone uploaded-image detection needs a small custom wrapper around `model.decoder(image_tensor)`.
+There are no generic mock adapters or built-in fallback algorithms. If a
+repository checkout, dependency, checkpoint, or accelerator is missing, the
+backend returns `setup_required` or `failed` and includes the runner logs.

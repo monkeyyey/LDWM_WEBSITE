@@ -7,8 +7,9 @@ class WatermarkRequest:
     method: str
     workflow: str
     message: str
+    submethod_id: str = ""
+    analysis_mode: str = ""
     seed: int = 42
-    strength: int = 68
     prompt: str = ""
     attack: str = "None"
     image_name: str | None = None

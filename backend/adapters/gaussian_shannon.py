@@ -1,31 +1,40 @@
 from schemas import WatermarkRequest, WatermarkResult
 
 from .base import ModelAdapter
+from .repo_process import run_repo_script, runner_python, save_image_input
 
 
 class GaussianShannonAdapter(ModelAdapter):
-    def command_plan(self, request: WatermarkRequest) -> list[str]:
-        if request.workflow == "generate":
-            return [
-                "python - <<'PY'\n"
-                "from infer import multi_generate_gauss\n"
-                "multi_generate_gauss(gen_index='web_job')\n"
-                "PY",
-            ]
-        if request.workflow in {"detect", "attack"}:
-            return [
-                "# Put uploaded/generated images in eval/generated_watermark/web_job_input/",
-                "python - <<'PY'\n"
-                "from infer import robustness_gauss_test\n"
-                "robustness_gauss_test('eval/generated_watermark/web_job_input', gen_index='web_job', sum=8)\n"
-                "PY",
-            ]
-        return []
-
     def run(self, request: WatermarkRequest) -> WatermarkResult:
-        # Real integration target:
-        # - invoke Gaussian-Shannon/infer.py
-        # - map message text into the repo's expected bit payload
-        # - parse LDPC/majority-vote recovery results into recovered_payload
-        # - expose advanced_embedding_attack as an attack-test backend option
-        return self.mock_result(request, score_offset=2)
+        job_id = self.make_job_id(request)
+        job_dir = self.project_root / "backend" / "storage" / "outputs" / job_id
+        script = self.project_root / "backend" / "integrations" / "gaussian_shannon" / "run_job.py"
+        coding = "ldpc" if request.submethod_id == "ldpc" else "gaussian"
+        command = [
+            runner_python("WATERMARK_GS_PYTHON"),
+            str(script),
+            "--repo", str(self.repo_path),
+            "--coding", coding,
+            "--message", request.message,
+            "--prompt", request.prompt or "a clean product photo of a ceramic mug on a desk",
+            "--seed", str(request.seed),
+            "--operation", "generate" if request.workflow == "generate" else "extract",
+            "--output-dir", str(job_dir),
+            "--attack", request.attack,
+        ]
+        if request.workflow != "generate":
+            image_path = save_image_input(self.project_root, request, job_id)
+            if image_path is None:
+                return WatermarkResult(job_id, request.method, request.workflow, "failed", 0, "missing upload", "real", None, ["Upload an image before extraction."], {})
+            command.extend(["--image", str(image_path)])
+            if request.source_job_id:
+                state_dir = self.project_root / "backend" / "storage" / "outputs" / request.source_job_id
+                if state_dir.is_dir():
+                    command.extend(["--state-dir", str(state_dir)])
+        return run_repo_script(
+            project_root=self.project_root,
+            request=request,
+            job_id=job_id,
+            command=command,
+            cwd=self.repo_path,
+        )

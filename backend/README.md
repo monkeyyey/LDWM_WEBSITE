@@ -1,178 +1,122 @@
 # Unified Watermark Backend
 
-This backend gives the website one stable API even though each research repo has its own environment, checkpoints, scripts, and output protocol.
-
-## Core Idea
-
-Do not merge every GitHub repo into one Python environment.
-
-Use this structure instead:
+This backend is an API gateway over three repository-specific implementations:
 
 ```text
-frontend
-  -> unified backend API
-    -> method adapter
-      -> isolated worker/container for that repo
-        -> repo-specific command, checkpoints, outputs
+frontend -> normalized API -> method adapter -> repository runner
 ```
 
-The frontend only talks to normalized endpoints. Each adapter hides the repo-specific details.
+The adapters do not invent a common watermark algorithm. They translate the
+shared request into the original SFWMark, Gaussian-Shannon, or LaWa workflow,
+run it in that repository's environment, and normalize its output.
 
-## Local Mock Server
-
-Run:
+## Run
 
 ```bash
 python3 backend/server.py --port 8000
 ```
 
-Check:
+Useful checks:
 
 ```bash
 curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/methods
 ```
 
-Example request:
-
-```bash
-curl -X POST http://127.0.0.1:8000/watermark/generate \
-  -H 'content-type: application/json' \
-  -d '{
-    "method": "sfwmark",
-    "prompt": "a clean product photo of a ceramic mug",
-    "message": "SIT-LDW-0001",
-    "seed": 42,
-    "strength": 68,
-    "attack": "None"
-  }'
-```
-
-## Real GPU Mode on AWS
-
-The `sfwmark` adapter now defaults to an official SFWMark generation path. On a CUDA EC2 instance, set it up with:
-
-```bash
-cd ~/1-latent-watermark-inject-and-detect
-source .venv/bin/activate
-bash backend/integrations/sfwmark/setup_sfwmark.sh
-```
-
-Check CUDA:
-
-```bash
-python3 - <<'PY'
-import torch
-print(torch.__version__)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
-PY
-```
-
-Check backend runtime diagnostics:
-
-```bash
-python3 backend/server.py --host 0.0.0.0 --port 8000
-curl http://127.0.0.1:8000/runtime
-```
-
-Run a direct official SFWMark generation smoke test without the browser:
-
-```bash
-bash backend/integrations/sfwmark/smoke_official_generate.sh
-```
-
-If this succeeds, it writes:
-
-```text
-backend/storage/outputs/official-smoke-test/watermarked.png
-```
-
-If it fails, the printed logs should say whether the issue is missing packages, CUDA, Hugging Face model access, or another runtime error.
-
-If you want to use the lightweight built-in fallback instead of the official SFWMark repo path:
-
-```bash
-SFWMARK_OFFICIAL=0 python3 backend/server.py --host 0.0.0.0 --port 8000
-```
-
-Start the backend:
-
-```bash
-python3 backend/server.py --host 0.0.0.0 --port 8000
-```
-
-Start the frontend:
+The frontend runs separately:
 
 ```bash
 cd watermark-lab
-npm install
-npm run dev -- --host 0.0.0.0
+pnpm install
+pnpm dev
 ```
 
-Open:
-
-```text
-http://<EC2_PUBLIC_IP>:5173
-```
-
-The real functional path is currently:
-
-```text
-SFWMark -> Generate Watermarked Image
-```
-
-It runs the official SFWMark `src/generate.py` against a one-prompt DB1k-compatible dataset, copies the generated watermarked image into backend storage, and returns it to the website preview.
-
-Gaussian Shannon and LaWa still need their heavier repo-specific environments/checkpoints before they can run real inference.
-
-## Normalized Endpoints
+## API
 
 ```text
 GET  /health
 GET  /methods
-POST /watermark/upload
+GET  /jobs              # SFWMark generated jobs with detection artifacts
 POST /watermark/generate
 POST /detect
 POST /attack-test
+GET  /files/<path>      # generated watermarked images and job artifacts
 ```
 
-## What Each Adapter Must Do
+All POST requests use the same fields where applicable:
 
-Each adapter should:
+```json
+{
+  "method": "sfwmark",
+  "submethodId": "hsqr",
+  "analysisMode": "verify",
+  "prompt": "a ceramic mug on a desk",
+  "message": "HSQR",
+  "seed": 42,
+  "attack": "None",
+  "imageDataUrl": null,
+  "sourceJobId": null
+}
+```
 
-- validate whether the method supports the requested workflow
-- map normalized fields into repo-specific CLI arguments
-- create a per-job working directory
-- call the repo inside its own environment/container
-- collect output images, CSV files, scores, and recovered bits
-- return the shared `WatermarkResult` shape
+There is no generic post-hoc watermark upload operation. The selected
+repositories watermark during generation; analysis accepts a generated or
+edited image and runs that repository's extraction/detection path.
 
-## Why This Works
+## Workflow Mapping
 
-The repositories can keep their own:
+The website presents the same three conceptual actions for every method:
 
-- Python version
-- PyTorch/CUDA version
-- conda or pip dependencies
-- checkpoint layout
-- command-line scripts
-- attack/evaluation protocol
+- **Generation** creates the watermarked image using the repository's native
+  generation path.
+- **Verification** maps to the repository's actual analysis: SFWMark compares
+  the inverted latent with the expected Fourier pattern; Gaussian-Shannon and
+  LaWa extract the message and report bit-level recovery.
+- **Identification** is available for SFWMark only. It searches the 2048-pattern
+  candidate bank and compares the predicted index with the ground-truth index.
+  The Gaussian-Shannon and LaWa repositories do not provide a candidate-bank
+  identification workflow, so the UI leaves that action unavailable.
 
-The website still sees one unified product.
+Robustness and LaWa quality evaluation remain secondary repository workflows.
+They are only exposed where the adapter has a real runner for them.
 
-## Recommended Production Shape
+## Repository Environments
 
-Use the local server as an API gateway, then replace mock adapters with job submissions:
+Each method needs its own Python environment, model weights, and usually a GPU.
+The adapter reports `setup_required` when those prerequisites are missing; it
+does not report a synthetic completed result.
+
+- `SFWMARK_REPO`: optional SFWMark checkout override.
+- `WATERMARK_GS_PYTHON`: Python executable for Gaussian-Shannon.
+- `WATERMARK_LAWA_PYTHON`: Python executable for LaWa.
+- `WATERMARK_DEVICE`: optional Torch device override for Gaussian-Shannon.
+
+The checked-out repositories expected by the default configuration are:
 
 ```text
-watermark-api
-redis queue
-sfwmark-worker
-gaussian-shannon-worker
-lawa-worker
-object storage for images/results
-postgres/sqlite for job metadata
+work/repos/SFWMark
+work/repos/Gaussian-Shannon
+work/repos/LaWa
 ```
 
-For cloud deployment, each worker should be built from a separate Dockerfile because the environments conflict.
+Setup helpers for SFWMark live in
+`backend/integrations/sfwmark/setup_sfwmark.sh`. The direct smoke scripts in
+that directory exercise official generation and detection without the browser.
+
+## SFWMark Output Contract
+
+Generation stores only the watermarked image for display. It also keeps the
+pattern bank, ground-truth index, and metadata needed by the repository-backed
+verification and identification actions. A clean comparison image is not
+served by the API.
+
+The SFWMark single-image adapter reports both analyses from the original
+repository logic:
+
+- verification distance to the known ground-truth pattern;
+- identification by `argmin` over the candidate bank, followed by accuracy
+  scoring against the stored ground-truth index.
+
+The original repository's full verification evaluation is a dataset-level ROC
+experiment. The website's one-image action exposes its underlying distance for
+the selected generated job, not a fabricated ROC score.

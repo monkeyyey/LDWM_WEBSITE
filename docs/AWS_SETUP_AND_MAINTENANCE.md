@@ -505,19 +505,11 @@ Detect it:
 bash backend/integrations/sfwmark/smoke_official_detect.sh HSQR
 ```
 
-Validate all four SFWMark modes:
-
-```bash
-bash backend/integrations/sfwmark/smoke_all_wm_types.sh 2>&1 | tee sfwmark-all-types.log
-```
-
-The four modes are:
+The supported website variants are:
 
 ```text
-HSQR
 HSTR
-Tree-Ring
-RingID
+HSQR
 ```
 
 Generated website jobs are stored in:
@@ -530,7 +522,6 @@ Each generation job should contain:
 
 ```text
 watermarked.png
-clean.png
 metadata.json
 pattern_list-2048.pt
 identify_gt_indices_1.npy
@@ -660,4 +651,3 @@ rm -rf ~/LDWM_WEBSITE/backend/storage/outputs/<job-id>
 ```
 
 Do not delete `~/.cache/huggingface` unless you are willing to redownload model weights.
-

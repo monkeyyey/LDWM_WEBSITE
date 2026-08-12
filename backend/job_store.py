@@ -58,7 +58,6 @@ def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
     jobs = []
     for job_dir in sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True):
         metadata = _read_json(job_dir / "metadata.json")
-        clean_url = f"/files/outputs/{job_dir.name}/clean.png" if (job_dir / "clean.png").is_file() else None
         jobs.append(
             {
                 "job_id": job_dir.name,
@@ -69,7 +68,6 @@ def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
                 "model_id": metadata.get("model_id"),
                 "created_at": metadata.get("created_at"),
                 "image_url": f"/files/outputs/{job_dir.name}/watermarked.png",
-                "clean_image_url": clean_url,
             }
         )
     return jobs

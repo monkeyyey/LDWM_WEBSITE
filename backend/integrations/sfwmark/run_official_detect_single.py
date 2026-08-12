@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -18,11 +17,12 @@ def main() -> int:
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--source-job-id", required=True)
     parser.add_argument("--image-path", required=True)
+    parser.add_argument("--analysis-mode", choices=["verify", "identify"], default="verify")
     parser.add_argument("--project-root", default=str(Path(__file__).resolve().parents[3]))
     args = parser.parse_args()
 
     project_root = Path(args.project_root).resolve()
-    sfw_dir = Path(os.environ.get("SFWMARK_REPO", project_root / "external" / "SFWMark")).resolve()
+    sfw_dir = configured_repo(project_root)
     src_dir = sfw_dir / "src"
     if not (src_dir / "utils.py").is_file():
         print(f"SFWMark repo not found at {sfw_dir}", file=sys.stderr)
@@ -40,12 +40,11 @@ def main() -> int:
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     wm_type = metadata.get("wm_type", "HSQR")
-    model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "sd2-community/stable-diffusion-2-1-base"))
+    model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "stabilityai/stable-diffusion-2-1-base"))
 
     sys.path.insert(0, str(src_dir))
     import utils as sfw_utils  # type: ignore
 
-    patch_generate_model_id(src_dir / "generate.py", model_id)
     torch_dtype = torch.float32
     pipe = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch_dtype)
     pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
@@ -55,11 +54,8 @@ def main() -> int:
     image = Image.open(args.image_path).convert("RGB").resize((512, 512))
     with torch.no_grad():
         inverted = sfw_utils.ddim_invert(pipe, [image], invert_guidance=0).cpu()
-        if wm_type in {"HSTR", "HSQR"}:
-            target_fft = torch.zeros_like(inverted, dtype=torch.complex64)
-            target_fft[sfw_utils.center_slice] = sfw_utils.fft(inverted[sfw_utils.center_slice])
-        else:
-            target_fft = sfw_utils.fft(inverted)
+        target_fft = torch.zeros_like(inverted, dtype=torch.complex64)
+        target_fft[sfw_utils.center_slice] = sfw_utils.fft(inverted[sfw_utils.center_slice])
 
         pattern_list = torch.load(pattern_path, map_location="cpu").cpu()
         identify_gt_indices = np.load(identify_path)
@@ -85,37 +81,27 @@ def main() -> int:
                 for candidate in pattern_list
             ]
         else:
-            is_center = wm_type == "HSTR"
-            channel_min = wm_type in {"RingID", "HSTR"}
-            if wm_type == "Tree-Ring":
-                mask = sfw_utils.watermark_region_mask_tree.cpu()
-                channel = sfw_utils.TREE_WATERMARK_CHANNEL
-            elif wm_type == "RingID":
-                mask = sfw_utils.watermark_region_mask_ringid.cpu()
-                channel = sfw_utils.RINGID_WATERMARK_CHANNEL
-            else:
-                mask = sfw_utils.watermark_region_mask_hstr.cpu()
-                channel = sfw_utils.RINGID_WATERMARK_CHANNEL
+            mask = sfw_utils.watermark_region_mask_hstr.cpu()
             distance = sfw_utils.get_distance(
                 pattern_gt,
                 target_fft,
                 mask=mask,
-                channel=channel,
+                channel=sfw_utils.RINGID_WATERMARK_CHANNEL,
                 p=1,
                 mode="complex",
-                channel_min=channel_min,
-                center=is_center,
+                channel_min=True,
+                center=True,
             )
             candidate_distances = [
                 sfw_utils.get_distance(
                     candidate,
                     target_fft,
                     mask=mask,
-                    channel=channel,
+                    channel=sfw_utils.RINGID_WATERMARK_CHANNEL,
                     p=1,
                     mode="complex",
-                    channel_min=channel_min,
-                    center=is_center,
+                    channel_min=True,
+                    center=True,
                 )
                 for candidate in pattern_list
             ]
@@ -126,19 +112,21 @@ def main() -> int:
     best_distance = float(sorted_distances[0])
     second_best_distance = float(sorted_distances[1]) if len(sorted_distances) > 1 else best_distance
     margin = max(0.0, second_best_distance - best_distance)
-    matched = predicted_index == key_index
-    confidence = min(99, max(1, int(round((margin / max(second_best_distance, 1e-6)) * 100))))
-    score = confidence if matched else max(1, 50 - confidence)
+    identified = predicted_index == key_index
+    score = 100 if identified else 0
 
     result = {
         "runner": "official-sfwmark-single-detect",
+        "analysis_mode": args.analysis_mode,
         "wm_type": wm_type,
         "model_id": model_id,
         "source_job_id": args.source_job_id,
         "image_path": str(args.image_path),
         "key_index": key_index,
         "predicted_index": predicted_index,
-        "matched": matched,
+        "identified": identified,
+        "matched": identified,
+        "verification_distance": float(distance),
         "distance": float(distance),
         "best_distance": best_distance,
         "second_best_distance": second_best_distance,
@@ -153,15 +141,12 @@ def main() -> int:
     return 0
 
 
-def patch_generate_model_id(generate_py: Path, model_id: str) -> None:
-    if not generate_py.is_file():
-        return
-    source = generate_py.read_text(encoding="utf-8")
-    match = re.search(r'model_id\s*=\s*"([^"]+)"', source)
-    if not match or match.group(1) == model_id:
-        return
-    patched = re.sub(r'model_id\s*=\s*"[^"]+"', f'model_id = "{model_id}"', source, count=1)
-    generate_py.write_text(patched, encoding="utf-8")
+def configured_repo(project_root: Path) -> Path:
+    configured = os.environ.get("SFWMARK_REPO")
+    if configured:
+        return Path(configured).resolve()
+    checked_in = project_root / "work" / "repos" / "SFWMark"
+    return checked_in if checked_in.is_dir() else (project_root / "external" / "SFWMark").resolve()
 
 
 if __name__ == "__main__":

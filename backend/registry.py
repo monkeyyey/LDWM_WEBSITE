@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from adapters import GaussianShannonAdapter, GenericAdapter, LawaAdapter, SfwmarkAdapter
+from adapters import GaussianShannonAdapter, LawaAdapter, SfwmarkAdapter
 from adapters.base import ModelAdapter
 
 
@@ -30,5 +30,5 @@ class MethodRegistry:
         if method_id not in self.methods:
             raise KeyError(f"Unknown method: {method_id}")
 
-        adapter_class = ADAPTERS.get(method_id, GenericAdapter)
+        adapter_class = ADAPTERS[method_id]
         return adapter_class(method_id, self.methods[method_id], self.project_root)

@@ -1,42 +1,30 @@
 # Watermark Lab
 
-Minimal local-first prototype for testing latent-domain image watermarking workflows.
+The frontend is a single environment for exploring three upstream latent-domain
+watermark repositories:
 
-## Workflows
+- SFWMark: HSQR and HSTR Fourier latent watermarking.
+- Gaussian-Shannon: Gaussian and LDPC coded message watermarking.
+- LaWa: the repository's pretrained 48-bit configuration.
 
-- Upload an image and apply a selected watermarking method.
-- Generate a new watermarked image from a prompt.
+Each method is organized around Generation, Verification, and Identification.
+Verification keeps the repository's own meaning: Fourier-pattern comparison for
+SFWMark, message extraction and BER/accuracy for Gaussian-Shannon and LaWa.
+Identification is disabled where the upstream repository has no candidate-key
+identification procedure.
 
-The current version uses mock results in the browser. The UI is ready for model services, but it does not run SFWMark, Gaussian Shannon, or LaWa yet.
-
-## Run Locally
+## Run
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Open:
-
-```text
-http://127.0.0.1:5173/
-```
-
-## Build
+Open `http://127.0.0.1:5173/` while the backend is running on port 8000.
 
 ```bash
-pnpm build
+python3 ../backend/server.py --port 8000
 ```
 
-## Future Model API Shape
-
-Recommended backend endpoints:
-
-```text
-POST /api/watermark/upload
-POST /api/watermark/generate
-POST /api/detect
-POST /api/attack
-```
-
-Each model should be wrapped behind the same request/response contract so the frontend can switch between SFWMark, Gaussian Shannon, and LaWa without model-specific UI code.
+The frontend never displays or downloads a clean comparison image. Generated
+outputs are the watermarked images returned by the selected repository runner.

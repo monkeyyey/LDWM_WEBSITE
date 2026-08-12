@@ -65,18 +65,28 @@
   margin-top: 3px;
 }
 
-.mode-tabs {
-  background: #eeeeea;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
+.sidebar-context {
+  border-left: 1px solid #deded8;
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+  padding-left: 18px;
+}
+
+.sidebar-context strong {
+  color: #222222;
+  font-size: 13px;
+}
+
+.sidebar-context span {
+  color: #73736d;
+  font-size: 12px;
 }
 
 button {
   font: inherit;
 }
 
-.mode-tabs button,
 .primary-button,
 .icon-button,
 .method-card {
@@ -90,18 +100,6 @@ button {
     background 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
-}
-
-.mode-tabs button {
-  background: transparent;
-  color: #5f5f59;
-  padding: 8px 13px;
-}
-
-.mode-tabs button.active,
-.mode-tabs button:hover {
-  background: #ffffff;
-  color: #111111;
 }
 
 .deployment {
@@ -210,6 +208,85 @@ button {
   display: block;
 }
 
+.method-navigation {
+  background: #ffffff;
+  border: 1px solid #deded8;
+  display: grid;
+  gap: 0;
+  margin-bottom: 14px;
+}
+
+.navigation-group {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  padding: 12px 14px;
+}
+
+.navigation-group + .navigation-group {
+  border-top: 1px solid #eeeeea;
+}
+
+.navigation-label {
+  display: grid;
+  gap: 3px;
+}
+
+.navigation-label span {
+  color: #73736d;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.navigation-label strong {
+  color: #222222;
+  font-size: 13px;
+}
+
+.submethod-tabs,
+.workflow-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.submethod-tabs button,
+.workflow-tabs button {
+  align-items: center;
+  background: #f7f7f4;
+  border: 1px solid #deded8;
+  color: #5f5f59;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.submethod-tabs button:hover,
+.workflow-tabs button:hover,
+.submethod-tabs button.active,
+.workflow-tabs button.active {
+  background: #171717;
+  border-color: #171717;
+  color: #ffffff;
+}
+
+.workflow-tabs button.disabled,
+.workflow-tabs button:disabled {
+  background: #f7f7f4;
+  border-color: #deded8;
+  color: #171717;
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .method-card small {
   color: #73736d;
   font-size: 12px;
@@ -246,6 +323,13 @@ button {
 
 .section-heading h3 {
   font-size: 16px;
+}
+
+.heading-description {
+  color: #73736d;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 3px 0 0;
 }
 
 .field,
@@ -395,6 +479,22 @@ textarea:focus {
   background: #edf6f2;
   border-color: #c8dfd5;
   color: #275246;
+}
+
+.evaluation-note {
+  align-items: flex-start;
+  background: #f1f1ed;
+  color: #5f5f59;
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.4;
+  padding: 11px 12px;
+}
+
+.evaluation-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .source-job-note strong {
@@ -594,14 +694,6 @@ input[type='range'] {
   line-height: 1.25;
 }
 
-.quality-bars {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 14px;
-}
-
-.quality-bars span,
 .api-note {
   align-items: center;
   color: #5f5f59;
@@ -609,12 +701,6 @@ input[type='range'] {
   gap: 7px;
   font-size: 13px;
   font-weight: 650;
-}
-
-progress {
-  accent-color: #171717;
-  height: 12px;
-  width: 100%;
 }
 
 .api-note {
@@ -675,22 +761,19 @@ progress {
     flex-direction: column;
   }
 
-  .mode-tabs {
-    overflow-x: auto;
+  .sidebar-context {
+    border-left: 0;
+    border-top: 1px solid #deded8;
+    padding-left: 0;
+    padding-top: 12px;
   }
 
   .method-grid,
+  .navigation-group,
   .main-grid,
   .field-row,
-  .metric-grid,
-  .quality-bars {
+  .metric-grid {
     grid-template-columns: 1fr;
-  }
-
-  .mode-tabs button {
-    flex: 1 1 0;
-    justify-content: center;
-    min-width: 0;
   }
 
   .result-panel {

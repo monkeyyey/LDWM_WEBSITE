@@ -4,10 +4,12 @@
     "category": "Fourier latent watermark",
     "repo_path": "../work/repos/SFWMark",
     "native_workflows": ["generate", "detect", "attack"],
+    "adapter_workflows": ["generate", "verification", "identification"],
+    "analysis_workflows": ["verification", "identification"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
       "wm_type": "HSQR",
-      "wm_type_options": ["Tree-Ring", "RingID", "HSTR", "HSQR"],
+      "wm_type_options": ["HSTR", "HSQR"],
       "dataset_id_options": ["coco", "Gustavo", "DB1k"],
       "quick_start_attacks": ["JPEG", "Diffusion", "CC", "RC"]
     },
@@ -20,6 +22,8 @@
     "category": "Communication-code latent watermark",
     "repo_path": "../work/repos/Gaussian-Shannon",
     "native_workflows": ["generate", "detect", "attack"],
+    "adapter_workflows": ["generate", "verification", "robustness"],
+    "analysis_workflows": ["extraction", "bit_error_rate", "robustness"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
       "model_id": "stabilityai/stable-diffusion-2-1",
@@ -29,13 +33,15 @@
     },
     "payload": "256-bit message encoded with Gaussian/LDPC communication coding",
     "environment": "conda python=3.12; pip install -r requirements.txt",
-    "notes": "Repo code is function-oriented rather than a polished CLI. Adapter should call infer.py functions or wrap them with a small CLI."
+    "notes": "Repo code is function-oriented rather than a polished CLI. The adapter runner calls its coding, latent insertion, inversion, and decoding functions."
   },
   "lawa": {
     "name": "LaWa",
     "category": "VAE latent watermark",
     "repo_path": "../work/repos/LaWa",
     "native_workflows": ["generate", "detect", "attack"],
+    "adapter_workflows": ["generate", "verification", "robustness", "quality"],
+    "analysis_workflows": ["extraction", "bit_accuracy", "robustness", "quality"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
       "config": "configs/SD14_LaWa_inference.yaml",

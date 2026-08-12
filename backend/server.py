@@ -10,7 +10,6 @@ from urllib.parse import unquote, urlparse
 
 from job_store import list_sfwmark_jobs
 from registry import MethodRegistry
-from runtimes.sfwmark_lite import runtime_report
 from schemas import WatermarkRequest
 
 
@@ -34,9 +33,6 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/methods":
             self._json({"methods": REGISTRY.list_methods()})
             return
-        if path == "/runtime":
-            self._json({"runtime": runtime_report()})
-            return
         if path == "/jobs":
             self._json({"jobs": list_sfwmark_jobs(PROJECT_ROOT)})
             return
@@ -48,7 +44,6 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         if path not in {
-            "/watermark/upload",
             "/watermark/generate",
             "/detect",
             "/attack-test",
@@ -58,7 +53,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         try:
             payload = self._read_json()
-            workflow = "upload" if path == "/watermark/upload" else "generate"
+            workflow = "generate"
             if path == "/detect":
                 workflow = "detect"
             if path == "/attack-test":
@@ -106,6 +101,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if storage_root not in file_path.parents and file_path != storage_root:
             self._json({"error": "Invalid file path"}, status=HTTPStatus.BAD_REQUEST)
             return
+        if file_path.name == "clean.png":
+            self._json({"error": "Clean comparison images are not available"}, status=HTTPStatus.NOT_FOUND)
+            return
         if not file_path.is_file():
             self._json({"error": "File not found"}, status=HTTPStatus.NOT_FOUND)
             return
@@ -134,6 +132,8 @@ def normalize_payload(payload: dict) -> dict:
         "imageName": "image_name",
         "imageDataUrl": "image_data_url",
         "sourceJobId": "source_job_id",
+        "submethodId": "submethod_id",
+        "analysisMode": "analysis_mode",
     }
     normalized = dict(payload)
     for source, target in aliases.items():
