@@ -100,13 +100,16 @@ work/repos/Gaussian-Shannon
 work/repos/LaWa
 ```
 
-Gaussian-Shannon setup can be prepared with:
+Gaussian-Shannon setup can be prepared with. Conda is used when available;
+otherwise the helper creates `.venv-gaussian-shannon` automatically:
 
 ```bash
 bash backend/integrations/gaussian_shannon/setup_gaussian_shannon.sh
 export WATERMARK_GS_REPO="$PWD/work/repos/Gaussian-Shannon"
-export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
 ```
+
+The setup command prints the correct `WATERMARK_GS_PYTHON` export for the
+runtime it selected.
 
 The runner preserves the upstream defaults: Gaussian coding uses redundancy
 64, LDPC coding uses redundancy 16, and generation uses float32 latent values.

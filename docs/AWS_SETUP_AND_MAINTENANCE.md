@@ -190,7 +190,11 @@ requirements specify Python 3.12 and PyTorch 2.5.1. From the project root:
 ```bash
 bash backend/integrations/gaussian_shannon/setup_gaussian_shannon.sh
 export WATERMARK_GS_REPO="$PWD/work/repos/Gaussian-Shannon"
-export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
+if command -v conda >/dev/null 2>&1; then
+  export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
+else
+  export WATERMARK_GS_PYTHON="$PWD/.venv-gaussian-shannon/bin/python"
+fi
 cat > .env.gpu <<EOF
 WATERMARK_GS_REPO=${WATERMARK_GS_REPO}
 WATERMARK_GS_PYTHON=${WATERMARK_GS_PYTHON}
