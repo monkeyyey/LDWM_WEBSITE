@@ -57,7 +57,10 @@ def generate(args, torch, Image, DDIMScheduler, StableDiffusionPipeline, gauss_e
         state = {"coding": "ldpc", "redundancy": redundancy, "num_elements": int(wm.shape[1]), "message": bits.tolist()}
         from scipy import sparse
 
-        sparse.save_npz(output / "ldpc_H.npz", H)
+        # pyldpc may return H as a dense ndarray even when sparse=True.
+        # save_npz requires an actual SciPy sparse matrix, while extraction
+        # can load the same matrix without changing the upstream algorithm.
+        sparse.save_npz(output / "ldpc_H.npz", sparse.csr_matrix(H))
         np.save(output / "ldpc_G.npy", G)
 
     model_id = args.model_id
