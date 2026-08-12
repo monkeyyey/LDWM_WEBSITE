@@ -65,6 +65,11 @@ run_python -m pip install --no-build-isolation "pyldpc==0.7.9"
 grep -vE '^(numpy==|pyldpc==)' "${FILTERED_REQ}" > "${FILTERED_REQ}.rest"
 run_python -m pip install -r "${FILTERED_REQ}.rest"
 
+# Diffusers declares Transformers as an optional integration dependency, but
+# StableDiffusionPipeline requires it at runtime. These packages are also
+# needed for loading the current safetensors model and GPU dispatch.
+run_python -m pip install "transformers==4.48.1" accelerate safetensors
+
 run_python - <<'PY'
 import sys
 import torch

@@ -118,7 +118,9 @@ The runner preserves the upstream defaults: Gaussian coding uses redundancy
 64, LDPC coding uses redundancy 16, and generation uses float32 latent values.
 The setup helper resolves an upstream dependency conflict by using NumPy 1.26.4
 with Matplotlib 3.8.2; override it with `WATERMARK_GS_NUMPY_VERSION` only when
-you have tested a compatible version.
+you have tested a compatible version. It also installs the Diffusers runtime
+companions `transformers`, `accelerate`, and `safetensors`, which are not all
+listed by the upstream requirements file.
 
 Setup helpers for SFWMark live in
 `backend/integrations/sfwmark/setup_sfwmark.sh`. The direct smoke scripts in
