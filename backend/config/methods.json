@@ -26,7 +26,7 @@
     "analysis_workflows": ["extraction", "bit_error_rate"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
-      "model_id": "stabilityai/stable-diffusion-2-1-base",
+      "model_id": "sd2-community/stable-diffusion-2-1-base",
       "message_bits": 256,
       "redundancy": 64,
       "scheduler_options": ["DDIMScheduler", "DPMSolverSinglestepScheduler", "DPMSolverMultistepScheduler"]

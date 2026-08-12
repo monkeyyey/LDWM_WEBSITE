@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument("--prompt", default="a clean product photo of a ceramic mug on a desk")
     parser.add_argument(
         "--model-id",
-        default=os.environ.get("WATERMARK_GS_MODEL_ID", "stabilityai/stable-diffusion-2-1-base"),
+        default=os.environ.get("WATERMARK_GS_MODEL_ID", "sd2-community/stable-diffusion-2-1-base"),
     )
     parser.add_argument("--redundancy", type=int)
     parser.add_argument("--steps", type=int, default=50)

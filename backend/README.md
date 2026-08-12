@@ -90,7 +90,8 @@ does not report a synthetic completed result.
 - `WATERMARK_GS_PYTHON`: Python executable for Gaussian-Shannon.
 - `WATERMARK_GS_REPO`: optional Gaussian-Shannon checkout override.
 - `WATERMARK_GS_MODEL_ID`: optional Hugging Face model override; the default is
-  `stabilityai/stable-diffusion-2-1-base`.
+  `sd2-community/stable-diffusion-2-1-base`, a currently available Diffusers
+  Stable Diffusion 2.1-base checkpoint.
 - `WATERMARK_LAWA_PYTHON`: Python executable for LaWa.
 - `WATERMARK_DEVICE`: optional Torch device override for Gaussian-Shannon.
 

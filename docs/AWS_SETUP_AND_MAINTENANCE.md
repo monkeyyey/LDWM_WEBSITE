@@ -215,7 +215,7 @@ PY
 ```
 
 The Gaussian-Shannon runner downloads or reuses
-`stabilityai/stable-diffusion-2-1-base` through Diffusers. Make sure the EC2
+`sd2-community/stable-diffusion-2-1-base` through Diffusers. Make sure the EC2
 instance has outbound access to Hugging Face and enough disk space for the
 model cache. The runner uses the upstream Gaussian redundancy of 64 and LDPC
 redundancy of 16.
