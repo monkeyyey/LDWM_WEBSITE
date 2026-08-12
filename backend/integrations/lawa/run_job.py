@@ -29,6 +29,9 @@ def generate(args, repo: Path):
     output.mkdir(parents=True, exist_ok=True)
     native_out = output / "native"
     native_out.mkdir(parents=True, exist_ok=True)
+    # The upstream script writes fixed evaluation CSV paths at shutdown but
+    # does not create their parent directory during single-image inference.
+    (repo / "results" / "SD14_LaWa").mkdir(parents=True, exist_ok=True)
     command = [
         os.environ.get("WATERMARK_LAWA_PYTHON", sys.executable),
         str(repo / "inference_AIGC.py"),
