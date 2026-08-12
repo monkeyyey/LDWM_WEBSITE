@@ -40,6 +40,9 @@ def main() -> int:
 
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     wm_type = metadata.get("wm_type", "HSQR")
+    if wm_type not in {"HSTR", "HSQR"}:
+        print(f"Unsupported SFWMark watermark type in metadata: {wm_type}", file=sys.stderr)
+        return 4
     model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "stabilityai/stable-diffusion-2-1-base"))
 
     sys.path.insert(0, str(src_dir))
@@ -59,7 +62,13 @@ def main() -> int:
 
         pattern_list = torch.load(pattern_path, map_location="cpu").cpu()
         identify_gt_indices = np.load(identify_path)
+        if pattern_list.ndim < 1 or len(pattern_list) == 0:
+            raise ValueError("SFWMark pattern bank is empty")
+        if identify_gt_indices.size == 0:
+            raise ValueError("SFWMark ground-truth index file is empty")
         key_index = int(identify_gt_indices[0])
+        if not 0 <= key_index < len(pattern_list):
+            raise ValueError(f"SFWMark ground-truth key index {key_index} is outside the pattern bank")
         pattern_gt = pattern_list[key_index].cpu()
 
         if wm_type == "HSQR":

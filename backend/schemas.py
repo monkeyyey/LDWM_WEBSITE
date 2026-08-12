@@ -11,7 +11,6 @@ class WatermarkRequest:
     analysis_mode: str = ""
     seed: int = 42
     prompt: str = ""
-    attack: str = "None"
     image_name: str | None = None
     image_data_url: str | None = None
     source_job_id: str | None = None

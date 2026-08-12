@@ -14,7 +14,7 @@ def main() -> int:
     args = parse_args()
     repo = Path(args.repo).resolve()
     try:
-        if args.operation in {"generate", "quality"}:
+        if args.operation == "generate":
             result = generate(args, repo)
         else:
             result = extract(args, repo)
@@ -57,16 +57,16 @@ def generate(args, repo: Path):
     image_path = output / "watermarked.png"
     shutil.copy2(candidates[0], image_path)
     metadata = {"message": args.message, "prompt": args.prompt, "seed": args.seed, "config": args.config, "weight": args.weight, "ckpt": args.ckpt}
-    (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     bit_accuracy = parse_last_metric(completed.stdout, "Bit acc")
     metadata["bit_accuracy"] = bit_accuracy
+    (output / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return {"status": "completed", "detection_score": int(round((bit_accuracy or 0.0) * 100)), "recovered_payload": args.message, "image_path": str(image_path), "raw": metadata}
 
 
 def extract(args, repo: Path):
     import numpy as np
     import torch
-    from PIL import Image, ImageEnhance, ImageFilter
+    from PIL import Image
     from omegaconf import OmegaConf
 
     sys.path.insert(0, str(repo / "stable-diffusion"))
@@ -84,8 +84,9 @@ def extract(args, repo: Path):
     for parameter in model.parameters():
         parameter.requires_grad = False
 
+    if not args.image:
+        raise ValueError("LaWa extraction requires an image")
     image = Image.open(args.image).convert("RGB")
-    image = apply_attack(image, args.attack, ImageEnhance, ImageFilter)
     image = image.resize((512, 512))
     tensor = torch.from_numpy(np.asarray(image).astype(np.float32) / 127.5 - 1.0).permute(2, 0, 1).unsqueeze(0).to(device)
     with torch.no_grad():
@@ -95,39 +96,7 @@ def extract(args, repo: Path):
     expected = args.message if len(args.message) == 48 and set(args.message) <= {"0", "1"} else None
     bit_error_rate = sum(left != right for left, right in zip(bits, expected)) / 48 if expected else None
     accuracy = 1.0 - bit_error_rate if bit_error_rate is not None else None
-    return {"status": "completed", "detection_score": int(round((accuracy or 0.0) * 100)), "recovered_payload": bits, "raw": {"bit_error_rate": bit_error_rate, "bit_accuracy": accuracy, "attack": args.attack}}
-
-
-def apply_attack(image, attack, ImageEnhance, ImageFilter):
-    if not attack or attack == "None":
-        return image
-    normalized = attack.lower()
-    if "jpeg" in normalized:
-        from io import BytesIO
-
-        buffer = BytesIO()
-        image.save(buffer, format="JPEG", quality=60)
-        buffer.seek(0)
-        from PIL import Image
-
-        return Image.open(buffer).convert("RGB")
-    if "rotation" in normalized:
-        from PIL import Image
-
-        return image.rotate(10, resample=Image.Resampling.BILINEAR)
-    if "crop" in normalized:
-        width, height = image.size
-        return image.crop((width // 10, height // 10, width * 9 // 10, height * 9 // 10)).resize((width, height))
-    if "resize" in normalized:
-        width, height = image.size
-        return image.resize((width // 2, height // 2)).resize((width, height))
-    if "blur" in normalized:
-        return image.filter(ImageFilter.GaussianBlur(radius=1.5))
-    if "contrast" in normalized:
-        return ImageEnhance.Contrast(image).enhance(0.8)
-    if "brightness" in normalized:
-        return ImageEnhance.Brightness(image).enhance(0.8)
-    return image
+    return {"status": "completed", "detection_score": int(round((accuracy or 0.0) * 100)), "recovered_payload": bits, "raw": {"bit_error_rate": bit_error_rate, "bit_accuracy": accuracy}}
 
 
 def parse_last_metric(output: str, label: str) -> float | None:
@@ -137,7 +106,7 @@ def parse_last_metric(output: str, label: str) -> float | None:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--operation", choices=["generate", "extract", "quality"], required=True)
+    parser.add_argument("--operation", choices=["generate", "extract"], required=True)
     parser.add_argument("--repo", required=True)
     parser.add_argument("--output-dir", default=".")
     parser.add_argument("--image")
@@ -147,7 +116,6 @@ def parse_args():
     parser.add_argument("--weight", default="weights/LaWa/last.ckpt")
     parser.add_argument("--ckpt", default="weights/stable-diffusion-v1/model.ckpt")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--attack", default="None")
     return parser.parse_args()
 
 

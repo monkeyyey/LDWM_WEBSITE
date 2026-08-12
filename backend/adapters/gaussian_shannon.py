@@ -7,6 +7,8 @@ from .repo_process import run_repo_script, runner_python, save_image_input
 class GaussianShannonAdapter(ModelAdapter):
     def run(self, request: WatermarkRequest) -> WatermarkResult:
         job_id = self.make_job_id(request)
+        if request.workflow not in {"generate", "detect"}:
+            return WatermarkResult(job_id, request.method, request.workflow, "unsupported", 0, "Gaussian-Shannon exposes generation and verification through message extraction.", "real", None, ["The selected workflow is not part of the application core."], {})
         job_dir = self.project_root / "backend" / "storage" / "outputs" / job_id
         script = self.project_root / "backend" / "integrations" / "gaussian_shannon" / "run_job.py"
         coding = "ldpc" if request.submethod_id == "ldpc" else "gaussian"
@@ -20,7 +22,6 @@ class GaussianShannonAdapter(ModelAdapter):
             "--seed", str(request.seed),
             "--operation", "generate" if request.workflow == "generate" else "extract",
             "--output-dir", str(job_dir),
-            "--attack", request.attack,
         ]
         if request.workflow != "generate":
             image_path = save_image_input(self.project_root, request, job_id)

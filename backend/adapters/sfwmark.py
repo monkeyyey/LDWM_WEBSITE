@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -68,7 +69,7 @@ class SfwmarkAdapter(ModelAdapter):
         wm_type = request.message if request.message in {"HSTR", "HSQR"} else "HSQR"
         runner = self.project_root / "backend" / "integrations" / "sfwmark" / "run_official_generate.py"
         command = [
-            sys.executable,
+            os.environ.get("SFWMARK_PYTHON", sys.executable),
             str(runner),
             "--prompt",
             request.prompt or "a clean product photo",
@@ -122,7 +123,7 @@ class SfwmarkAdapter(ModelAdapter):
             method=request.method,
             workflow=request.workflow,
             status="completed",
-            detection_score=95,
+            detection_score=0,
             recovered_payload=f"{wm_type} official SFWMark image generated",
             runtime="official-sfwmark",
             image_url=f"/files/{rel_path.as_posix()}",
@@ -165,7 +166,7 @@ class SfwmarkAdapter(ModelAdapter):
 
         runner = self.project_root / "backend" / "integrations" / "sfwmark" / "run_official_detect_single.py"
         command = [
-            sys.executable,
+            os.environ.get("SFWMARK_PYTHON", sys.executable),
             str(runner),
             "--job-id",
             job_id,

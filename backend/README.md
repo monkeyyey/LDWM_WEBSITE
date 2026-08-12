@@ -39,7 +39,6 @@ GET  /methods
 GET  /jobs              # SFWMark generated jobs with detection artifacts
 POST /watermark/generate
 POST /detect
-POST /attack-test
 GET  /files/<path>      # generated watermarked images and job artifacts
 ```
 
@@ -53,7 +52,6 @@ All POST requests use the same fields where applicable:
   "prompt": "a ceramic mug on a desk",
   "message": "HSQR",
   "seed": 42,
-  "attack": "None",
   "imageDataUrl": null,
   "sourceJobId": null
 }
@@ -77,8 +75,9 @@ The website presents the same three conceptual actions for every method:
   The Gaussian-Shannon and LaWa repositories do not provide a candidate-bank
   identification workflow, so the UI leaves that action unavailable.
 
-Robustness and LaWa quality evaluation remain secondary repository workflows.
-They are only exposed where the adapter has a real runner for them.
+The API surface is limited to the repository-backed generation and analysis
+workflows described above. It does not advertise secondary attack or quality
+experiments as product actions.
 
 ## Repository Environments
 
@@ -87,7 +86,9 @@ The adapter reports `setup_required` when those prerequisites are missing; it
 does not report a synthetic completed result.
 
 - `SFWMARK_REPO`: optional SFWMark checkout override.
+- `SFWMARK_PYTHON`: Python executable for the SFWMark environment.
 - `WATERMARK_GS_PYTHON`: Python executable for Gaussian-Shannon.
+- `WATERMARK_GS_REPO`: optional Gaussian-Shannon checkout override.
 - `WATERMARK_LAWA_PYTHON`: Python executable for LaWa.
 - `WATERMARK_DEVICE`: optional Torch device override for Gaussian-Shannon.
 
@@ -98,6 +99,17 @@ work/repos/SFWMark
 work/repos/Gaussian-Shannon
 work/repos/LaWa
 ```
+
+Gaussian-Shannon setup can be prepared with:
+
+```bash
+bash backend/integrations/gaussian_shannon/setup_gaussian_shannon.sh
+export WATERMARK_GS_REPO="$PWD/work/repos/Gaussian-Shannon"
+export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
+```
+
+The runner preserves the upstream defaults: Gaussian coding uses redundancy
+64, LDPC coding uses redundancy 16, and generation uses float32 latent values.
 
 Setup helpers for SFWMark live in
 `backend/integrations/sfwmark/setup_sfwmark.sh`. The direct smoke scripts in

@@ -34,7 +34,7 @@ def main() -> int:
 
     output_dir_name = f"web_outputs/{args.job_id}"
     command = [
-        sys.executable,
+        os.environ.get("SFWMARK_PYTHON", sys.executable),
         "generate.py",
         "--wm_type",
         args.wm_type,
@@ -58,14 +58,16 @@ def main() -> int:
     if generated is None:
         print(f"Expected generated image missing under: {output_base / 'img_pil_wm'}", file=sys.stderr)
         return 3
+    if not pattern.is_file() or not identify.is_file():
+        missing = [str(path) for path in (pattern, identify) if not path.is_file()]
+        print(f"SFWMark generation artifacts missing: {', '.join(missing)}", file=sys.stderr)
+        return 3
 
     job_dir = project_root / "backend" / "storage" / "outputs" / args.job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(generated, job_dir / "watermarked.png")
-    if pattern.is_file():
-        shutil.copy2(pattern, job_dir / "pattern_list-2048.pt")
-    if identify.is_file():
-        shutil.copy2(identify, job_dir / "identify_gt_indices_1.npy")
+    shutil.copy2(pattern, job_dir / "pattern_list-2048.pt")
+    shutil.copy2(identify, job_dir / "identify_gt_indices_1.npy")
 
     (job_dir / "metadata.json").write_text(
         json.dumps(

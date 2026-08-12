@@ -30,8 +30,6 @@ Repository: `work/repos/Gaussian-Shannon`
 - Verification is represented by inversion, extraction, and comparison with
   the supplied 256-bit message.
 - The repository reports bit error rate rather than a candidate-key identity.
-- Its robustness helpers remain available as a secondary attack workflow.
-
 The adapter runner calls the repository's `gauss_encode`, `ldpc_encode`,
 `watermarkToLatents`, `latentsToWatermark`, and decoder functions.
 
@@ -44,8 +42,6 @@ Repository: `work/repos/LaWa`
 - Verification uses the modified decoder to extract 48 bits and reports bit
   accuracy and bit error rate.
 - The repository has no candidate-bank identification procedure.
-- Its attack and quality workflows are secondary evaluations, not new
-  watermarking algorithms.
 
 The extraction runner loads the same LaWa model and calls its `model.decoder`
 path. It does not claim arbitrary-image watermark embedding.

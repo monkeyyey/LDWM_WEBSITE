@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import time
 from pathlib import Path
 
@@ -12,7 +13,17 @@ class ModelAdapter:
         self.method_id = method_id
         self.config = config
         self.project_root = project_root
-        self.repo_path = (project_root / "backend" / config["repo_path"]).resolve()
+        env_name = {
+            "sfwmark": "SFWMARK_REPO",
+            "gaussian-shannon": "WATERMARK_GS_REPO",
+            "lawa": "WATERMARK_LAWA_REPO",
+        }.get(method_id)
+        override = os.environ.get(env_name) if env_name else None
+        configured_path = (project_root / "backend" / config["repo_path"]).resolve()
+        external_path = project_root / "external" / configured_path.name
+        self.repo_path = Path(override).resolve() if override else configured_path
+        if not override and not self.repo_path.is_dir() and external_path.is_dir():
+            self.repo_path = external_path.resolve()
 
     def run(self, request: WatermarkRequest) -> WatermarkResult:
         raise NotImplementedError

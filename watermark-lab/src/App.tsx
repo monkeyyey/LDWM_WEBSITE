@@ -20,8 +20,8 @@ import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useState } fr
 import './App.css'
 
 type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa'
-type WorkflowId = 'generate' | 'verify' | 'identify' | 'robustness' | 'quality'
-type BackendWorkflow = 'detect' | 'generate' | 'attack'
+type WorkflowId = 'generate' | 'verify' | 'identify'
+type BackendWorkflow = 'detect' | 'generate'
 
 type WorkflowSpec = {
   id: WorkflowId
@@ -49,7 +49,6 @@ type Method = {
   mechanism: string
   bestFor: string
   color: string
-  attacks: string[]
   submethods: SubmethodSpec[]
 }
 
@@ -108,22 +107,18 @@ const sfwmarkWorkflow: WorkflowSpec[] = [
   { id: 'generate', label: 'Generation', description: 'Sample Gaussian latent noise, insert the Fourier watermark, and generate the watermarked image.', backendWorkflow: 'generate', available: true },
   { id: 'verify', label: 'Verification', description: 'Compare the inverted latent with the expected saved watermark pattern.', backendWorkflow: 'detect', available: true },
   { id: 'identify', label: 'Identification', description: 'Search the candidate pattern bank and return the closest predicted watermark index.', backendWorkflow: 'detect', available: true },
-  { id: 'robustness', label: 'Robustness', description: 'The upstream repo has attack evaluation, but this app does not expose it until it is wired to the official evaluation protocol.', backendWorkflow: null, available: false },
 ]
 
 const gaussianWorkflows: WorkflowSpec[] = [
   { id: 'generate', label: 'Generation', description: 'Encode a 256-bit message into a redundant latent representation before diffusion generation.', backendWorkflow: 'generate', available: true },
   { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 256-bit message; the repository reports bit error rate.', backendWorkflow: 'detect', available: true },
   { id: 'identify', label: 'Identification', description: 'The upstream Gaussian-Shannon repo has no candidate-key identification workflow.', backendWorkflow: null, available: false },
-  { id: 'robustness', label: 'Robustness', description: 'Measure decoded-message recovery after the repository attack transformations.', backendWorkflow: 'attack', available: true },
 ]
 
 const lawaWorkflows: WorkflowSpec[] = [
   { id: 'generate', label: 'Generation', description: 'Generate with the LaWa modified decoder and a pretrained 48-bit watermark.', backendWorkflow: 'generate', available: true },
   { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 48-bit message; the repository reports bit accuracy and bit error rate.', backendWorkflow: 'detect', available: true },
   { id: 'identify', label: 'Identification', description: 'The upstream LaWa repo has no candidate-key identification workflow.', backendWorkflow: null, available: false },
-  { id: 'robustness', label: 'Robustness', description: 'Evaluate extraction after the repository rotation, crop, resize, blur, JPEG, and color attacks.', backendWorkflow: 'attack', available: true },
-  { id: 'quality', label: 'Quality Evaluation', description: 'Run the repository-style quality evaluation for generated outputs.', backendWorkflow: 'attack', available: true },
 ]
 
 const methods: Method[] = [
@@ -135,7 +130,6 @@ const methods: Method[] = [
     mechanism: 'Embeds a keyed pattern into the Fourier space of Gaussian latent noise before Stable Diffusion generation.',
     bestFor: 'Pattern verification and identification from a generated image after DDIM inversion.',
     color: '#136f63',
-    attacks: ['None', 'JPEG', 'Diffusion', 'Center crop (CC)', 'Random crop (RC)', 'Blur', 'Noise', 'Brightness', 'Contrast'],
     submethods: [
       { id: 'hsqr', name: 'HSQR', description: 'Hermitian-symmetric QR-like Fourier pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSQR', repoDefaults: ['wm_type: HSQR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
       { id: 'hstr', name: 'HSTR', description: 'Hermitian-symmetric tree-ring pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSTR', repoDefaults: ['wm_type: HSTR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
@@ -147,9 +141,8 @@ const methods: Method[] = [
     shortName: 'GS',
     category: 'Communication-code watermark',
     mechanism: 'Treats generation and inversion as a noisy channel, using redundancy and coding to recover exact bits.',
-    bestFor: 'Message verification and bit error measurement under image attacks.',
+    bestFor: 'Message verification and bit error measurement after inversion.',
     color: '#7a4f00',
-    attacks: ['None', 'JPEG', 'Gaussian blur', 'Gaussian noise', 'Random crop', 'Random drop', 'Rotate', 'SDEdit'],
     submethods: [
       { id: 'gaussian', name: 'Gaussian coding', description: 'Gaussian diffusion of the message with spatial redundancy and majority-vote decoding.', payload: '256-bit message', defaultMessage: '256-bit zero message', repoDefaults: ['encoder: Gaussian', 'message: 256 bits', 'redundancy: 64'], workflows: gaussianWorkflows },
       { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting code with pseudo-random sign flips, redundancy, and a majority-vote fallback.', payload: '256-bit message', defaultMessage: '256-bit zero message', repoDefaults: ['encoder: LDPC', 'message: 256 bits', 'code rate: 0.25'], workflows: gaussianWorkflows },
@@ -161,9 +154,8 @@ const methods: Method[] = [
     shortName: 'LW',
     category: 'VAE decoder watermark',
     mechanism: 'Uses a modified Stable Diffusion VAE decoder to carry a pretrained binary watermark during generation.',
-    bestFor: '48-bit message verification with repository quality and attack evaluations.',
+    bestFor: '48-bit message verification with the pretrained decoder.',
     color: '#315f9f',
-    attacks: ['None', 'Rotation', 'Center crop', 'Resize', 'Blur', 'JPEG', 'Contrast', 'Brightness', 'Hue', 'Combined'],
     submethods: [
       { id: 'lawa-48', name: 'LaWa 48-bit', description: 'The repository exposes one pretrained LaWa configuration with a 48-bit message and SD v1.4.', payload: '48-bit message', defaultMessage: '110111001110110001000000011101000110011100110101', repoDefaults: ['config: SD14_LaWa_inference.yaml', 'message_len: 48', 'checkpoint: sd-v1-4.ckpt'], workflows: lawaWorkflows },
     ],
@@ -183,7 +175,6 @@ function App() {
   const [prompt, setPrompt] = useState('a clean product photo of a ceramic mug on a desk')
   const [message, setMessage] = useState(methods[0].submethods[0].defaultMessage)
   const [seed, setSeed] = useState(42)
-  const [attack, setAttack] = useState(methods[0].attacks[0])
   const [uploadName, setUploadName] = useState('No image selected')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sourceJobId, setSourceJobId] = useState<string | null>(null)
@@ -195,15 +186,13 @@ function App() {
   const selectedSubmethod = useMemo(() => selectedMethod.submethods.find((submethod) => submethod.id === submethodId) ?? selectedMethod.submethods[0], [selectedMethod, submethodId])
   const selectedWorkflow = useMemo(() => selectedSubmethod.workflows.find((workflow) => workflow.id === workflowId) ?? selectedSubmethod.workflows[0], [selectedSubmethod, workflowId])
   const isGeneration = selectedWorkflow.id === 'generate'
-  const isEvaluation = selectedWorkflow.id === 'quality'
-  const needsImage = !isGeneration && !isEvaluation
+  const needsImage = !isGeneration
   const isSfwAnalysis = selectedMethod.id === 'sfwmark' && !isGeneration
 
   useEffect(() => {
     const nextSubmethod = selectedMethod.submethods[0]
     setSubmethodId(nextSubmethod.id)
     setMessage(nextSubmethod.defaultMessage)
-    setAttack(selectedMethod.attacks[0])
     setWorkflowId(nextSubmethod.workflows[0].id)
   }, [methodId, selectedMethod])
 
@@ -266,7 +255,7 @@ function App() {
     setResult((current) => ({ ...current, workflow, status: 'running', title: `Running ${workflowSpec.label.toLowerCase()}`, notes: `Calling backend at ${apiBase}.` }))
 
     try {
-      const endpoint = workflowSpec.backendWorkflow === 'detect' ? '/detect' : workflowSpec.backendWorkflow === 'attack' ? '/attack-test' : '/watermark/generate'
+      const endpoint = workflowSpec.backendWorkflow === 'detect' ? '/detect' : '/watermark/generate'
       const response = await fetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -277,7 +266,6 @@ function App() {
           prompt,
           message,
           seed,
-          attack,
           imageName: uploadName === 'No image selected' ? null : uploadName,
           imageDataUrl: uploadedImage,
           sourceJobId,
@@ -342,7 +330,9 @@ function App() {
 
   function resultTitle(methodName: string, workflow: WorkflowId, backendResult: BackendResult) {
     const workflowLabel = workflow === 'generate' ? 'generation' : selectedSubmethod.workflows.find((item) => item.id === workflow)?.label.toLowerCase() ?? 'analysis'
-    if (backendResult.status === 'failed' || backendResult.status === 'setup_required' || backendResult.status === 'unsupported') return `${methodName} ${workflowLabel} unavailable`
+    if (backendResult.status === 'setup_required') return `${methodName} ${workflowLabel} needs runtime setup`
+    if (backendResult.status === 'unsupported') return `${methodName} ${workflowLabel} unavailable`
+    if (backendResult.status === 'failed') return `${methodName} ${workflowLabel} failed`
     return `${methodName} ${workflowLabel} complete`
   }
 
@@ -353,8 +343,6 @@ function App() {
     if (workflow === 'verify' && selectedMethod.id === 'sfwmark' && raw) return `Verification distance against the ground-truth pattern: ${typeof raw.verification_distance === 'number' ? raw.verification_distance.toFixed(4) : 'recorded'}. The original repo uses this distance for ROC evaluation.`
     if (workflow === 'identify' && raw) return `Closest candidate is pattern ${raw.predicted_index}; identification was ${raw.identified ? 'correct' : 'incorrect'}. The ground-truth key is used only to score the result.`
     if (workflow === 'verify') return `Verification is represented by the repository's extraction step. Recovered bits are compared with the supplied message and reported as bit error rate or bit accuracy.`
-    if (workflow === 'robustness') return `${attack} robustness evaluation completed for ${selectedSubmethod.name}.`
-    if (workflow === 'quality') return 'Repository-style quality evaluation completed or was queued by the backend.'
     return backendResult.recovered_payload || 'Extraction completed.'
   }
 
@@ -390,7 +378,7 @@ function App() {
 
         <section className="method-navigation" aria-label={`${selectedMethod.name} submethods and workflows`}>
           <div className="navigation-group"><div className="navigation-label"><span>Submethod</span><strong>{selectedMethod.name}</strong></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>
-          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-disabled={!workflow.available} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : workflow.id === 'verify' ? <ShieldCheck size={15} /> : workflow.id === 'robustness' ? <ShieldCheck size={15} /> : workflow.id === 'quality' ? <Gauge size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div></div>
+          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-disabled={!workflow.available} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div></div>
         </section>
 
         <section className="main-grid">
@@ -405,23 +393,20 @@ function App() {
               {sourceJobId && uploadedImage ? <div className="previous-job-preview"><img src={uploadedImage} alt="Selected watermarked output" /><div><strong>{jobs.find((job) => job.job_id === sourceJobId)?.label ?? `Job ${sourceJobId}`}</strong><span>{jobs.find((job) => job.job_id === sourceJobId)?.prompt ?? 'Selected watermarked image'}</span></div></div> : null}
             </> : null}
 
-            {selectedWorkflow.id === 'quality' ? <div className="evaluation-note"><Gauge size={18} /><span>This is an evaluation workflow from the LaWa repository. It produces quality metrics rather than a new image upload.</span></div> : null}
-
             <div className="field-row">
-              <label className="field"><span>{selectedMethod.id === 'sfwmark' ? 'Watermark variant' : selectedSubmethod.payload}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={selectedWorkflow.id === 'robustness' || selectedWorkflow.id === 'quality'} />}</label>
+              <label className="field"><span>{selectedMethod.id === 'sfwmark' ? 'Watermark variant' : selectedSubmethod.payload}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} />}</label>
               <label className="field small-field"><span>Seed</span><input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration} /></label>
             </div>
 
             <section className="method-explainer" aria-label={`${selectedMethod.name} explanation`}><div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div><div className="latent-facts"><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>{selectedMethod.id === 'sfwmark' ? <div className="workflow-chain" aria-label="SFWMark latent workflow">{['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image', 'DDIM inversion', 'Extraction / identification'].map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div> : null}</section>
 
-            {selectedWorkflow.id === 'robustness' ? <label className="field"><span>Attack / transformation</span><select value={attack} onChange={(event) => setAttack(event.target.value)}>{selectedMethod.attacks.map((attackName) => <option key={attackName}>{attackName}</option>)}</select></label> : null}
             <div className="repo-defaults" aria-label="Repository defaults">{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>
           </div>
 
-          <div className="preview-panel"><div className="section-heading"><Aperture size={18} /><div><h3>{isGeneration ? 'Generated Image' : isEvaluation ? 'Evaluation Run' : 'Analysis Image'}</h3><p className="heading-description">{isGeneration ? 'Only the watermarked output is shown.' : isEvaluation ? 'Repository quality metrics for the selected method.' : 'The image supplied to this repository workflow.'}</p></div></div><div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>{uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded watermarked preview" /> : <div className="latent-grid" />}<span className="stage-badge">{isGeneration ? 'watermarked image' : isEvaluation ? 'repository evaluation' : 'analysis input'}</span></div><div className="method-detail"><strong>{selectedWorkflow.label}: {selectedSubmethod.name}</strong><p>{selectedWorkflow.description}</p></div></div>
+          <div className="preview-panel"><div className="section-heading"><Aperture size={18} /><div><h3>{isGeneration ? 'Generated Image' : 'Analysis Image'}</h3><p className="heading-description">{isGeneration ? 'Only the watermarked output is shown.' : 'The image supplied to this repository workflow.'}</p></div></div><div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>{uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded watermarked preview" /> : <div className="latent-grid" />}<span className="stage-badge">{isGeneration ? 'watermarked image' : 'analysis input'}</span></div><div className="method-detail"><strong>{selectedWorkflow.label}: {selectedSubmethod.name}</strong><p>{selectedWorkflow.description}</p></div></div>
 
           <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
-            <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>{result.workflow === 'robustness' ? 'Robustness score' : result.workflow === 'quality' ? 'Quality output' : 'Bit error rate'}</span><strong>{result.workflow === 'quality' ? (result.status === 'done' ? 'Recorded' : '--') : result.workflow === 'verify' ? (result.bitErrorRate ?? '--') : result.score ? `${result.score}%` : '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
+            <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
             <div className="api-note"><KeyRound size={18} /><p>{result.notes}</p></div>
             {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions"><button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
           </div>

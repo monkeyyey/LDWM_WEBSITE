@@ -7,12 +7,14 @@ from .repo_process import run_repo_script, runner_python, save_image_input
 class LawaAdapter(ModelAdapter):
     def run(self, request: WatermarkRequest) -> WatermarkResult:
         job_id = self.make_job_id(request)
+        if request.workflow not in {"generate", "detect"}:
+            return WatermarkResult(job_id, request.method, request.workflow, "unsupported", 0, "LaWa exposes generation and verification through message extraction.", "real", None, ["The selected workflow is not part of the application core."], {})
         job_dir = self.project_root / "backend" / "storage" / "outputs" / job_id
         script = self.project_root / "backend" / "integrations" / "lawa" / "run_job.py"
         message = request.message
         if len(message) != 48 or any(bit not in "01" for bit in message):
             message = "110111001110110001000000011101000110011100110101"
-        operation = "generate" if request.workflow == "generate" else "quality" if request.analysis_mode == "quality" else "extract"
+        operation = "generate" if request.workflow == "generate" else "extract"
         command = [
             runner_python("WATERMARK_LAWA_PYTHON"),
             str(script),
@@ -21,7 +23,6 @@ class LawaAdapter(ModelAdapter):
             "--output-dir", str(job_dir),
             "--message", message,
             "--prompt", request.prompt or "A white plate of food on a dining table",
-            "--attack", request.attack,
         ]
         if operation == "extract":
             image_path = save_image_input(self.project_root, request, job_id)

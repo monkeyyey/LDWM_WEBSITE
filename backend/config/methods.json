@@ -22,8 +22,8 @@
     "category": "Communication-code latent watermark",
     "repo_path": "../work/repos/Gaussian-Shannon",
     "native_workflows": ["generate", "detect", "attack"],
-    "adapter_workflows": ["generate", "verification", "robustness"],
-    "analysis_workflows": ["extraction", "bit_error_rate", "robustness"],
+    "adapter_workflows": ["generate", "verification"],
+    "analysis_workflows": ["extraction", "bit_error_rate"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
       "model_id": "stabilityai/stable-diffusion-2-1",
@@ -40,8 +40,8 @@
     "category": "VAE latent watermark",
     "repo_path": "../work/repos/LaWa",
     "native_workflows": ["generate", "detect", "attack"],
-    "adapter_workflows": ["generate", "verification", "robustness", "quality"],
-    "analysis_workflows": ["extraction", "bit_accuracy", "robustness", "quality"],
+    "adapter_workflows": ["generate", "verification"],
+    "analysis_workflows": ["extraction", "bit_accuracy"],
     "not_native": ["post_hoc_upload_watermark"],
     "default_config": {
       "config": "configs/SD14_LaWa_inference.yaml",

@@ -41,3 +41,4 @@ print("gpu:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "n
 PY
 
 echo "SFWMark ready at ${SFW_DIR}"
+echo "Run the backend with SFWMARK_PYTHON set to this environment's Python if it is not the default python."

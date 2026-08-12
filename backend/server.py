@@ -46,7 +46,6 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path not in {
             "/watermark/generate",
             "/detect",
-            "/attack-test",
         }:
             self._json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
@@ -56,8 +55,6 @@ class ApiHandler(BaseHTTPRequestHandler):
             workflow = "generate"
             if path == "/detect":
                 workflow = "detect"
-            if path == "/attack-test":
-                workflow = "attack"
             payload = normalize_payload(payload)
             request = WatermarkRequest(workflow=workflow, **payload)
             adapter = REGISTRY.get_adapter(request.method)

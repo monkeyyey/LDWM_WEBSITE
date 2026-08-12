@@ -10,7 +10,7 @@ Browser
   -> Nginx on ports 80/443
   -> Vite frontend on 127.0.0.1:5173
   -> Python backend on 127.0.0.1:8000
-  -> SFWMark + Stable Diffusion on the AWS GPU
+  -> SFWMark + Gaussian-Shannon + LaWa on the AWS GPU
 ```
 
 ## 1. AWS Instance
@@ -182,6 +182,40 @@ hf auth login
 
 Important: keep `huggingface_hub` below `1.0`, because the current SFWMark dependency stack uses `transformers==4.48.1`.
 
+## 8. Gaussian-Shannon Environment
+
+Gaussian-Shannon has its own Python environment because its upstream
+requirements specify Python 3.12 and PyTorch 2.5.1. From the project root:
+
+```bash
+bash backend/integrations/gaussian_shannon/setup_gaussian_shannon.sh
+export WATERMARK_GS_REPO="$PWD/work/repos/Gaussian-Shannon"
+export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
+cat > .env.gpu <<EOF
+WATERMARK_GS_REPO=${WATERMARK_GS_REPO}
+WATERMARK_GS_PYTHON=${WATERMARK_GS_PYTHON}
+EOF
+```
+
+Confirm the environment before starting the backend:
+
+```bash
+"$WATERMARK_GS_PYTHON" - <<'PY'
+import torch
+import diffusers
+print(torch.__version__)
+print(diffusers.__version__)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no CUDA GPU")
+PY
+```
+
+The Gaussian-Shannon runner downloads or reuses
+`stabilityai/stable-diffusion-2-1` through Diffusers. Make sure the EC2
+instance has outbound access to Hugging Face and enough disk space for the
+model cache. The runner uses the upstream Gaussian redundancy of 64 and LDPC
+redundancy of 16.
+
 Check versions:
 
 ```bash
@@ -195,7 +229,7 @@ print("diffusers:", diffusers.__version__)
 PY
 ```
 
-## 8. Node And Frontend Setup
+## 9. Node And Frontend Setup
 
 Install Node with `nvm`:
 
@@ -213,7 +247,7 @@ cd ~/LDWM_WEBSITE/watermark-lab
 npm install
 ```
 
-## 9. Manual Run Commands
+## 10. Manual Run Commands
 
 Backend:
 
@@ -236,7 +270,7 @@ With Nginx, access:
 https://ldwm.anyhow.sbs
 ```
 
-## 10. Nginx Reverse Proxy
+## 11. Nginx Reverse Proxy
 
 Install Nginx:
 
@@ -288,7 +322,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 11. HTTPS With Certbot
+## 12. HTTPS With Certbot
 
 Install Certbot:
 
@@ -316,7 +350,7 @@ sudo systemctl reload nginx
 curl -I https://ldwm.anyhow.sbs
 ```
 
-## 12. systemd Services
+## 13. systemd Services
 
 Use two services:
 
@@ -345,6 +379,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/LDWM_WEBSITE
 Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/ubuntu/LDWM_WEBSITE/.env.gpu
 ExecStart=/home/ubuntu/LDWM_WEBSITE/.venv/bin/python backend/server.py --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
@@ -403,7 +438,7 @@ sudo systemctl status ldwm-backend --no-pager
 sudo systemctl status ldwm-frontend --no-pager
 ```
 
-## 13. Normal Maintenance Workflow
+## 14. Normal Maintenance Workflow
 
 After pushing code from local machine:
 
@@ -433,7 +468,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart ldwm-backend ldwm-frontend
 ```
 
-## 14. Logs
+## 15. Logs
 
 Backend logs:
 
@@ -460,7 +495,7 @@ Certbot logs:
 sudo tail -f /var/log/letsencrypt/letsencrypt.log
 ```
 
-## 15. Validation Commands
+## 16. Validation Commands
 
 Health check:
 
@@ -489,7 +524,7 @@ node/Vite listening on 127.0.0.1:5173
 python backend listening on 127.0.0.1:8000
 ```
 
-## 16. SFWMark Validation
+## 17. SFWMark Validation
 
 Generate one SFWMark image:
 
@@ -527,7 +562,7 @@ pattern_list-2048.pt
 identify_gt_indices_1.npy
 ```
 
-## 17. Common Problems
+## 18. Common Problems
 
 ### Website Shows Nginx Default Page
 
@@ -631,7 +666,7 @@ print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
 PY
 ```
 
-## 18. Disk Maintenance
+## 19. Disk Maintenance
 
 Check disk:
 

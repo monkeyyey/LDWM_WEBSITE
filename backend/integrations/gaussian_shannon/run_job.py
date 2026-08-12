@@ -16,19 +16,21 @@ def main() -> int:
 
     try:
         import torch
-        from PIL import Image, ImageEnhance, ImageFilter
+        from PIL import Image
         from diffusers import DDIMInverseScheduler, DDIMScheduler, StableDiffusionPipeline
         from ldpc import gauss_decode, gauss_encode, latentsToWatermark, ldpc_decode, ldpc_encode, watermarkToLatents
 
         device = choose_device(torch)
-        dtype = torch.float16 if device == "cuda" else torch.float32
+        # The upstream Gaussian-Shannon generation path uses float32. Keeping
+        # that dtype avoids changing the latent symbols during integration.
+        dtype = torch.float32
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
 
         if args.operation == "generate":
             result = generate(args, torch, Image, DDIMScheduler, StableDiffusionPipeline, gauss_encode, ldpc_encode, watermarkToLatents, device, dtype)
         else:
-            result = extract(args, torch, Image, ImageEnhance, ImageFilter, DDIMInverseScheduler, StableDiffusionPipeline, gauss_decode, ldpc_decode, latentsToWatermark, device, dtype)
+            result = extract(args, torch, Image, DDIMInverseScheduler, StableDiffusionPipeline, gauss_decode, ldpc_decode, latentsToWatermark, device, dtype)
     except Exception as exc:
         result = {
             "status": "failed",
@@ -46,11 +48,13 @@ def generate(args, torch, Image, DDIMScheduler, StableDiffusionPipeline, gauss_e
     bits = parse_bits(args.message)
     batch_size = 1
     if args.coding == "gaussian":
-        wm = gauss_encode(bits, batch_size=batch_size, redundancy=args.redundancy)
-        state = {"coding": "gaussian", "redundancy": args.redundancy, "num_elements": int(wm.shape[1])}
+        redundancy = effective_redundancy(args)
+        wm = gauss_encode(bits, batch_size=batch_size, redundancy=redundancy)
+        state = {"coding": "gaussian", "redundancy": redundancy, "num_elements": int(wm.shape[1])}
     else:
-        wm, H, G = ldpc_encode(bits, batch_size=batch_size, redundancy=args.redundancy, CR=0.25)
-        state = {"coding": "ldpc", "redundancy": args.redundancy, "num_elements": int(wm.shape[1]), "message": bits.tolist()}
+        redundancy = effective_redundancy(args)
+        wm, H, G = ldpc_encode(bits, batch_size=batch_size, redundancy=redundancy, CR=0.25)
+        state = {"coding": "ldpc", "redundancy": redundancy, "num_elements": int(wm.shape[1]), "message": bits.tolist()}
         from scipy import sparse
 
         sparse.save_npz(output / "ldpc_H.npz", H)
@@ -65,12 +69,16 @@ def generate(args, torch, Image, DDIMScheduler, StableDiffusionPipeline, gauss_e
     result = pipe(prompt=[args.prompt], negative_prompt=[""], guidance_scale=7.5, num_inference_steps=args.steps, latents=latents, output_type="pil")
     image_path = output / "watermarked.png"
     result.images[0].save(image_path)
+    if not image_path.is_file():
+        raise FileNotFoundError(f"Gaussian-Shannon did not produce {image_path}")
     state.update({"message": bits.tolist(), "model_id": model_id, "prompt": args.prompt, "seed": args.seed, "steps": args.steps})
     (output / "metadata.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return {"status": "completed", "detection_score": 0, "recovered_payload": bits_to_string(bits), "image_path": str(image_path), "raw": state}
 
 
-def extract(args, torch, Image, ImageEnhance, ImageFilter, DDIMInverseScheduler, StableDiffusionPipeline, gauss_decode, ldpc_decode, latentsToWatermark, device, dtype):
+def extract(args, torch, Image, DDIMInverseScheduler, StableDiffusionPipeline, gauss_decode, ldpc_decode, latentsToWatermark, device, dtype):
+    if not args.image:
+        raise ValueError("Gaussian-Shannon extraction requires an image")
     image_path = Path(args.image).resolve()
     state_dir = Path(args.state_dir).resolve() if args.state_dir else None
     state = read_state(state_dir)
@@ -80,7 +88,6 @@ def extract(args, torch, Image, ImageEnhance, ImageFilter, DDIMInverseScheduler,
     expected = np.array(parse_bits(args.message), dtype=int)
 
     image = Image.open(image_path).convert("RGB")
-    image = apply_attack(image, args.attack, ImageEnhance, ImageFilter)
     image = image.resize((512, 512))
     pixels = torch.from_numpy(np.asarray(image).astype(np.float32) / 255.0).permute(2, 0, 1).unsqueeze(0).to(device=device, dtype=dtype)
     pixels = pixels * 2.0 - 1.0
@@ -105,33 +112,7 @@ def extract(args, torch, Image, ImageEnhance, ImageFilter, DDIMInverseScheduler,
     decoded = np.asarray(decoded, dtype=int)[:256]
     bit_string = bits_to_string(decoded)
     bit_error_rate = float(np.mean(decoded != expected)) if expected.shape == decoded.shape else None
-    return {"status": "completed", "detection_score": int(round((1.0 - (bit_error_rate or 0.0)) * 100)), "recovered_payload": bit_string, "raw": {"coding": coding, "redundancy": redundancy, "bit_error_rate": bit_error_rate, "attack": args.attack}}
-
-
-def apply_attack(image, attack, ImageEnhance, ImageFilter):
-    if not attack or attack == "None":
-        return image
-    normalized = attack.lower()
-    if "jpeg" in normalized:
-        from io import BytesIO
-
-        buffer = BytesIO()
-        image.save(buffer, format="JPEG", quality=60)
-        buffer.seek(0)
-        from PIL import Image as PILImage
-
-        return PILImage.open(buffer).convert("RGB")
-    if "blur" in normalized:
-        return image.filter(ImageFilter.GaussianBlur(radius=1.5))
-    if "brightness" in normalized:
-        return ImageEnhance.Brightness(image).enhance(0.85)
-    if "contrast" in normalized:
-        return ImageEnhance.Contrast(image).enhance(0.8)
-    if "crop" in normalized:
-        width, height = image.size
-        cropped = image.crop((width // 10, height // 10, width * 9 // 10, height * 9 // 10))
-        return cropped.resize((width, height))
-    return image
+    return {"status": "completed", "detection_score": int(round((1.0 - (bit_error_rate or 0.0)) * 100)), "recovered_payload": bit_string, "raw": {"coding": coding, "redundancy": redundancy, "bit_error_rate": bit_error_rate}}
 
 
 def choose_device(torch):
@@ -175,11 +156,16 @@ def parse_args():
     parser.add_argument("--message", default="256-bit zero message")
     parser.add_argument("--prompt", default="a clean product photo of a ceramic mug on a desk")
     parser.add_argument("--model-id", default="stabilityai/stable-diffusion-2-1")
-    parser.add_argument("--redundancy", type=int, default=64)
+    parser.add_argument("--redundancy", type=int)
     parser.add_argument("--steps", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--attack", default="None")
     return parser.parse_args()
+
+
+def effective_redundancy(args) -> int:
+    if args.redundancy is not None:
+        return args.redundancy
+    return 64 if args.coding == "gaussian" else 16
 
 
 if __name__ == "__main__":
