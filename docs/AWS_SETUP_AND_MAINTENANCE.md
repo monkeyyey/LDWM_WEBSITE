@@ -215,10 +215,15 @@ PY
 ```
 
 The Gaussian-Shannon runner downloads or reuses
-`stabilityai/stable-diffusion-2-1` through Diffusers. Make sure the EC2
+`stabilityai/stable-diffusion-2-1-base` through Diffusers. Make sure the EC2
 instance has outbound access to Hugging Face and enough disk space for the
 model cache. The runner uses the upstream Gaussian redundancy of 64 and LDPC
 redundancy of 16.
+
+When the backend is managed by `systemctl`, do not rely on shell `export`
+commands. The service reads `/home/ubuntu/LDWM_WEBSITE/.env.gpu` through its
+`EnvironmentFile` entry, so these variables persist across shell sessions and
+reboots. Restart `ldwm-backend` after changing that file.
 
 Check versions:
 
