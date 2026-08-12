@@ -9,7 +9,9 @@ VENV_DIR="${WATERMARK_GS_VENV:-${PROJECT_ROOT}/.venv-gaussian-shannon}"
 if command -v conda >/dev/null 2>&1; then
   RUNTIME="conda"
   if ! conda env list | awk '{print $1}' | grep -Fxq "${ENV_NAME}"; then
-    conda create -n "${ENV_NAME}" python=3.12 -y
+    # Use conda-forge explicitly so setup does not depend on Anaconda's
+    # interactive channel Terms of Service acceptance.
+    conda create --override-channels -c conda-forge -n "${ENV_NAME}" python=3.12 -y
   fi
   run_python() { conda run -n "${ENV_NAME}" python "$@"; }
   PYTHON_PATH="$(run_python -c 'import sys; print(sys.executable)')"
@@ -46,12 +48,22 @@ run_python -m pip install --upgrade pip
 # Keep the upstream torch/torchvision versions, but install the CUDA 12.4
 # wheels explicitly so the environment can use the EC2 GPU.
 FILTERED_REQ="$(mktemp)"
-trap 'rm -f "${FILTERED_REQ}"' EXIT
+trap 'rm -f "${FILTERED_REQ}" "${FILTERED_REQ}.rest"' EXIT
 grep -vE '^(torch==|torchvision==)' "${GS_DIR}/requirements.txt" > "${FILTERED_REQ}"
 run_python -m pip install \
   torch==2.5.1 torchvision==0.20.1 \
   --index-url https://download.pytorch.org/whl/cu124
-run_python -m pip install -r "${FILTERED_REQ}"
+
+# The upstream requirements pin matplotlib 3.8.2 (which requires numpy<2) while
+# also pinning an incompatible numpy 2.x release. Use the latest stable 1.x
+# wheel supported by Python 3.12; it satisfies the rest of this environment.
+# pyldpc 0.7.9 imports NumPy from setup.py without declaring it as a build
+# requirement, so install the prerequisite first and disable build isolation.
+NUMPY_VERSION="${WATERMARK_GS_NUMPY_VERSION:-1.26.4}"
+run_python -m pip install "numpy==${NUMPY_VERSION}" setuptools wheel
+run_python -m pip install --no-build-isolation "pyldpc==0.7.9"
+grep -vE '^(numpy==|pyldpc==)' "${FILTERED_REQ}" > "${FILTERED_REQ}.rest"
+run_python -m pip install -r "${FILTERED_REQ}.rest"
 
 run_python - <<'PY'
 import sys
