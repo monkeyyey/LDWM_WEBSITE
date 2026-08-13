@@ -115,7 +115,19 @@ def extract(args, torch, Image, DDIMInverseScheduler, StableDiffusionPipeline, g
     decoded = np.asarray(decoded, dtype=int)[:256]
     bit_string = bits_to_string(decoded)
     bit_error_rate = float(np.mean(decoded != expected)) if expected.shape == decoded.shape else None
-    return {"status": "completed", "detection_score": int(round((1.0 - (bit_error_rate or 0.0)) * 100)), "recovered_payload": bit_string, "raw": {"coding": coding, "redundancy": redundancy, "bit_error_rate": bit_error_rate}}
+    return {
+        "status": "completed",
+        "detection_score": int(round((1.0 - (bit_error_rate or 0.0)) * 100)),
+        "recovered_payload": bit_string,
+        "raw": {
+            "coding": coding,
+            "redundancy": redundancy,
+            "num_elements": num_elements,
+            "latent_shape": [1, 4, 64, 64],
+            "decoder": "majority vote",
+            "bit_error_rate": bit_error_rate,
+        },
+    }
 
 
 def choose_device(torch):

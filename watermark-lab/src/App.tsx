@@ -89,6 +89,11 @@ type BackendResult = {
     distance?: number
     bit_error_rate?: number
     bit_accuracy?: number
+    coding?: string
+    redundancy?: number
+    num_elements?: number
+    latent_shape?: number[]
+    decoder?: string
     analysis_mode?: string
     identified?: boolean
     verification_distance?: number
@@ -437,6 +442,7 @@ function App() {
 
           <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
             <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
+            {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shannon' && result.raw ? <div className="repository-result-note"><div><span>Repository decoding</span><strong>{result.raw.coding ?? selectedSubmethod.name} · {result.raw.redundancy ?? '--'} redundant copies · {result.raw.num_elements ?? '--'} extracted symbols</strong></div><div><span>Decision rule</span><strong>{result.raw.decoder ?? 'majority vote'}</strong></div><div><span>Verification score</span><strong>{result.score}% bit accuracy</strong></div></div> : null}
             <div className="api-note"><KeyRound size={18} /><p>{result.notes}</p></div>
             {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions"><button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
           </div>
