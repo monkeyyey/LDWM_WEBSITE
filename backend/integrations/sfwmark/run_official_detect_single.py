@@ -11,6 +11,9 @@ import torch
 from PIL import Image
 from diffusers import DDIMScheduler, DiffusionPipeline
 
+DEFAULT_SFW_MODEL_ID = "sd2-community/stable-diffusion-2-1-base"
+LEGACY_SFW_MODEL_ID = "stabilityai/stable-diffusion-2-1-base"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run official SFWMark detection for one generated website image.")
@@ -43,7 +46,11 @@ def main() -> int:
     if wm_type not in {"HSTR", "HSQR"}:
         print(f"Unsupported SFWMark watermark type in metadata: {wm_type}", file=sys.stderr)
         return 4
-    model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "sd2-community/stable-diffusion-2-1-base"))
+    model_id = os.environ.get("SFW_MODEL_ID") or metadata.get("model_id") or DEFAULT_SFW_MODEL_ID
+    if model_id == LEGACY_SFW_MODEL_ID:
+        # Older jobs recorded the repository ID before it was removed from the Hub.
+        # The replacement contains the same Stable Diffusion 2.1 base checkpoint.
+        model_id = DEFAULT_SFW_MODEL_ID
 
     sys.path.insert(0, str(src_dir))
     import utils as sfw_utils  # type: ignore
