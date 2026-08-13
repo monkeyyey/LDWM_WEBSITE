@@ -43,7 +43,7 @@ def main() -> int:
     if wm_type not in {"HSTR", "HSQR"}:
         print(f"Unsupported SFWMark watermark type in metadata: {wm_type}", file=sys.stderr)
         return 4
-    model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "stabilityai/stable-diffusion-2-1-base"))
+    model_id = os.environ.get("SFW_MODEL_ID", metadata.get("model_id", "sd2-community/stable-diffusion-2-1-base"))
 
     sys.path.insert(0, str(src_dir))
     import utils as sfw_utils  # type: ignore

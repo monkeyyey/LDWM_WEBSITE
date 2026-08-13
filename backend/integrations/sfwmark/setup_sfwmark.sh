@@ -19,6 +19,13 @@ else
   git -C "${SFW_DIR}" pull --ff-only
 fi
 
+# The upstream scripts hard-code a model identifier that is no longer
+# available on Hugging Face. Keep the repository algorithm intact while
+# pointing its generation and detection pipeline at the current checkpoint.
+SFW_MODEL_ID="${SFW_MODEL_ID:-sd2-community/stable-diffusion-2-1-base}"
+sed -i "s#stabilityai/stable-diffusion-2-1-base#${SFW_MODEL_ID}#g" \
+  "${SFW_DIR}/src/generate.py" "${SFW_DIR}/src/detect.py"
+
 python -m pip install --upgrade pip
 
 # The AWS Deep Learning AMI already provides a CUDA-enabled torch build.

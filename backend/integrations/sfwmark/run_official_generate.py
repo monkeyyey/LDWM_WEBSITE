@@ -25,7 +25,7 @@ def main() -> int:
         return 2
 
     src_dir = sfw_dir / "src"
-    model_id = "stabilityai/stable-diffusion-2-1-base"
+    model_id = os.environ.get("SFW_MODEL_ID", "sd2-community/stable-diffusion-2-1-base")
 
     dataset_dir = src_dir / "text_dataset" / "DiffusionDB"
     dataset_dir.mkdir(parents=True, exist_ok=True)
