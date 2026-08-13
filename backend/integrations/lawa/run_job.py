@@ -77,7 +77,10 @@ def extract(args, repo: Path):
     from ldm.util import instantiate_from_config
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    config = normalize_targets(OmegaConf.to_container(OmegaConf.load(args.config).model, resolve=False))
+    # Keep LaWa's original stable-diffusion target namespace. Its bundled
+    # AutoencoderKL loader handles the pretrained checkpoint format used by
+    # the repository; the duplicate top-level ldm package does not.
+    config = OmegaConf.load(args.config).model
     model = instantiate_from_config(config)
     state_dict = torch.load(args.weight, map_location="cpu")
     if "state_dict" in state_dict:
@@ -120,20 +123,6 @@ def parse_args():
     parser.add_argument("--ckpt", default="weights/stable-diffusion-v1/model.ckpt")
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
-
-
-def normalize_targets(value):
-    if isinstance(value, dict):
-        return {key: normalize_targets(normalize_target(key, item)) for key, item in value.items()}
-    if isinstance(value, list):
-        return [normalize_targets(item) for item in value]
-    return value
-
-
-def normalize_target(key, value):
-    if key == "target" and isinstance(value, str) and value.startswith("stable-diffusion."):
-        return value.removeprefix("stable-diffusion.")
-    return value
 
 
 if __name__ == "__main__":

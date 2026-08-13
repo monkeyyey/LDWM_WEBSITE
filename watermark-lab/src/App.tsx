@@ -16,7 +16,7 @@ import {
   Sparkles,
   Waves,
 } from 'lucide-react'
-import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa'
@@ -29,6 +29,10 @@ type WorkflowSpec = {
   description: string
   backendWorkflow: BackendWorkflow | null
   available: boolean
+  inputs: string[]
+  outputs: string[]
+  source: string
+  unavailableReason?: string
 }
 
 type SubmethodSpec = {
@@ -98,27 +102,30 @@ type JobSummary = {
   job_number?: number
   label: string
   prompt: string
+  method: MethodId
+  submethod_id: string
   wm_type: string
+  message?: string
   created_at?: string
   image_url: string
 }
 
 const sfwmarkWorkflow: WorkflowSpec[] = [
-  { id: 'generate', label: 'Generation', description: 'Sample Gaussian latent noise, insert the Fourier watermark, and generate the watermarked image.', backendWorkflow: 'generate', available: true },
-  { id: 'verify', label: 'Verification', description: 'Compare the inverted latent with the expected saved watermark pattern.', backendWorkflow: 'detect', available: true },
-  { id: 'identify', label: 'Identification', description: 'Search the candidate pattern bank and return the closest predicted watermark index.', backendWorkflow: 'detect', available: true },
+  { id: 'generate', label: 'Generation', description: 'Sample Gaussian latent noise, insert the Fourier watermark, and generate the watermarked image.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', 'HSQR or HSTR', 'Seed'], outputs: ['Watermarked image', '2048-pattern bank', 'Ground-truth key index'], source: 'No source job required' },
+  { id: 'verify', label: 'Verification', description: 'Compare the inverted latent with the expected saved watermark pattern.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Compatible generation job'], outputs: ['Fourier verification distance'], source: 'Uses the saved pattern and key artifacts' },
+  { id: 'identify', label: 'Identification', description: 'Search the candidate pattern bank and return the closest predicted watermark index.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Compatible generation job'], outputs: ['Predicted pattern index', 'Correct/incorrect against stored key'], source: 'Searches the saved 2048-pattern bank' },
 ]
 
 const gaussianWorkflows: WorkflowSpec[] = [
-  { id: 'generate', label: 'Generation', description: 'Encode a 256-bit message into a redundant latent representation before diffusion generation.', backendWorkflow: 'generate', available: true },
-  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 256-bit message; the repository reports bit error rate.', backendWorkflow: 'detect', available: true },
-  { id: 'identify', label: 'Identification', description: 'The upstream Gaussian-Shannon repo has no candidate-key identification workflow.', backendWorkflow: null, available: false },
+  { id: 'generate', label: 'Generation', description: 'Encode a 256-bit message into a redundant latent representation before diffusion generation.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', '256-bit binary message', 'Seed'], outputs: ['Watermarked image', 'Coding metadata'], source: 'No source job required' },
+  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 256-bit message; the repository reports bit error rate.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Expected 256-bit message', 'Compatible generation job'], outputs: ['Recovered 256 bits', 'Bit error rate'], source: 'DDIM inversion plus Gaussian or LDPC decoding' },
+  { id: 'identify', label: 'Identification', description: 'The upstream Gaussian-Shannon repo has no candidate-key identification workflow.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'No candidate-key identification procedure is implemented.' },
 ]
 
 const lawaWorkflows: WorkflowSpec[] = [
-  { id: 'generate', label: 'Generation', description: 'Generate with the LaWa modified decoder and a pretrained 48-bit watermark.', backendWorkflow: 'generate', available: true },
-  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 48-bit message; the repository reports bit accuracy and bit error rate.', backendWorkflow: 'detect', available: true },
-  { id: 'identify', label: 'Identification', description: 'The upstream LaWa repo has no candidate-key identification workflow.', backendWorkflow: null, available: false },
+  { id: 'generate', label: 'Generation', description: 'Generate with the LaWa modified decoder and a pretrained 48-bit watermark.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', '48-bit binary message', 'Seed'], outputs: ['Watermarked image'], source: 'No source job required' },
+  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 48-bit message; the repository reports bit accuracy and bit error rate.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Expected 48-bit message'], outputs: ['Recovered 48 bits', 'Bit accuracy', 'Bit error rate'], source: 'Pretrained LaWa decoder' },
+  { id: 'identify', label: 'Identification', description: 'The upstream LaWa repo has no candidate-key identification workflow.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'LaWa decodes a message but does not search a candidate-key bank.' },
 ]
 
 const methods: Method[] = [
@@ -181,6 +188,7 @@ function App() {
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [result, setResult] = useState<Result>({ status: 'idle', workflow: 'generate', title: 'Ready', score: 0, bits: '--', runtime: '--', notes: 'Choose a method, submethod, and workflow, then run the repository-backed action.', imageUrl: null })
+  const runTokenRef = useRef(0)
 
   const selectedMethod = useMemo(() => methods.find((method) => method.id === methodId) ?? methods[0], [methodId])
   const selectedSubmethod = useMemo(() => selectedMethod.submethods.find((submethod) => submethod.id === submethodId) ?? selectedMethod.submethods[0], [selectedMethod, submethodId])
@@ -188,6 +196,23 @@ function App() {
   const isGeneration = selectedWorkflow.id === 'generate'
   const needsImage = !isGeneration
   const isSfwAnalysis = selectedMethod.id === 'sfwmark' && !isGeneration
+  const messageFieldLabel = selectedMethod.id === 'sfwmark'
+    ? 'Watermark variant'
+    : selectedMethod.id === 'gaussian-shannon'
+      ? 'Message (256 binary bits; "256-bit zero message" means all zeros)'
+      : 'Message (48 binary bits)'
+
+  const loadJobs = useCallback(async () => {
+    try {
+      const query = new URLSearchParams({ method: selectedMethod.id, submethod: selectedSubmethod.id })
+      const response = await fetch(`${apiBase}/jobs?${query.toString()}`)
+      if (!response.ok) return
+      const payload = await response.json()
+      setJobs(payload.jobs ?? [])
+    } catch {
+      setJobs([])
+    }
+  }, [selectedMethod.id, selectedSubmethod.id])
 
   useEffect(() => {
     const nextSubmethod = selectedMethod.submethods[0]
@@ -197,23 +222,12 @@ function App() {
   }, [methodId, selectedMethod])
 
   useEffect(() => {
-    if (selectedMethod.id === 'sfwmark' && !isGeneration) void loadJobs()
-  }, [selectedMethod.id, isGeneration])
+    if (!isGeneration) void loadJobs()
+  }, [isGeneration, loadJobs])
 
   useEffect(() => {
     if (!selectedSubmethod.workflows.some((workflow) => workflow.id === workflowId)) setWorkflowId(selectedSubmethod.workflows[0].id)
   }, [selectedSubmethod, workflowId])
-
-  async function loadJobs() {
-    try {
-      const response = await fetch(`${apiBase}/jobs`)
-      if (!response.ok) return
-      const payload = await response.json()
-      setJobs(payload.jobs ?? [])
-    } catch {
-      setJobs([])
-    }
-  }
 
   function selectSubmethod(id: string) {
     const next = selectedMethod.submethods.find((submethod) => submethod.id === id)
@@ -221,6 +235,7 @@ function App() {
     setSubmethodId(id)
     setMessage(next.defaultMessage)
     setWorkflowId(next.workflows[0].id)
+    clearAnalysisContext()
     resetResult(next.workflows[0].id)
   }
 
@@ -230,7 +245,16 @@ function App() {
     setSubmethodId(nextMethod.submethods[0].id)
     setMessage(nextMethod.submethods[0].defaultMessage)
     setWorkflowId(nextMethod.submethods[0].workflows[0].id)
+    clearAnalysisContext()
     resetResult(nextMethod.submethods[0].workflows[0].id)
+  }
+
+  function clearAnalysisContext() {
+    runTokenRef.current += 1
+    setUploadedImage(null)
+    setUploadName('No image selected')
+    setSourceJobId(null)
+    setSelectedJobId('')
   }
 
   function selectWorkflow(id: WorkflowId) {
@@ -251,6 +275,8 @@ function App() {
   }
 
   async function runBackendJob(workflow: WorkflowId = selectedWorkflow.id) {
+    const runToken = ++runTokenRef.current
+    const requestMethodId = methodId
     const workflowSpec = selectedSubmethod.workflows.find((item) => item.id === workflow) ?? selectedWorkflow
     setResult((current) => ({ ...current, workflow, status: 'running', title: `Running ${workflowSpec.label.toLowerCase()}`, notes: `Calling backend at ${apiBase}.` }))
 
@@ -279,6 +305,7 @@ function App() {
       }
 
       const payload = await response.json()
+      if (runToken !== runTokenRef.current || requestMethodId !== methodId) return
       const backendResult = payload.result as BackendResult
       const backendImageUrl = backendResult.image_url ? `${fileBase}${backendResult.image_url}` : null
       const backendJobId = backendResult.job_id ?? null
@@ -321,10 +348,10 @@ function App() {
     setUploadedImage(`${fileBase}${job.image_url}`)
     setSourceJobId(job.job_id)
     setUploadName(`Previous ${job.label}`)
-    const matchingSubmethod = selectedMethod.submethods.find((submethod) => submethod.name === job.wm_type)
+    const matchingSubmethod = selectedMethod.submethods.find((submethod) => submethod.id === job.submethod_id)
     if (matchingSubmethod) {
       setSubmethodId(matchingSubmethod.id)
-      setMessage(matchingSubmethod.defaultMessage)
+      setMessage(job.message || matchingSubmethod.defaultMessage)
     }
   }
 
@@ -378,7 +405,7 @@ function App() {
 
         <section className="method-navigation" aria-label={`${selectedMethod.name} submethods and workflows`}>
           <div className="navigation-group"><div className="navigation-label"><span>Submethod</span><strong>{selectedMethod.name}</strong></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>
-          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-disabled={!workflow.available} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div></div>
+          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-disabled={!workflow.available} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : workflow.unavailableReason ?? `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div>{selectedSubmethod.workflows.filter((workflow) => !workflow.available).map((workflow) => <p className="workflow-unavailable" key={workflow.id}><strong>{workflow.label} unavailable:</strong> {workflow.unavailableReason}</p>)}</div></div>
         </section>
 
         <section className="main-grid">
@@ -389,16 +416,16 @@ function App() {
             {needsImage ? <>
               <label className="upload-zone primary-upload"><input accept="image/*" onChange={handleUpload} type="file" /><ImageUp size={20} /><span>{uploadName}</span></label>
               <div className={`source-job-note ${sourceJobId ? 'linked' : ''}`}><strong>{sourceJobId ? `Linked generation job: ${sourceJobId}` : 'No generation job linked'}</strong><span>{isSfwAnalysis ? 'SFWMark analysis uses the saved pattern bank and key associated with a generated job.' : 'Upload a generated or edited image for repository extraction/evaluation.'}</span></div>
-              {isSfwAnalysis ? <label className="field previous-job-field"><span>Choose previous generated job</span><select value={selectedJobId} onChange={(event) => selectPreviousJob(event.target.value)}><option value="">Select a saved SFWMark job</option>{jobs.map((job) => <option key={job.job_id} value={job.job_id}>{job.label} · {job.prompt || job.job_id}</option>)}</select></label> : null}
+              <label className="field previous-job-field"><span>Choose previous generated job</span><select value={selectedJobId} onChange={(event) => selectPreviousJob(event.target.value)}><option value="">Select a saved {selectedSubmethod.name} job</option>{jobs.map((job) => <option key={job.job_id} value={job.job_id}>{job.label} · {job.prompt || job.job_id}</option>)}</select></label>
               {sourceJobId && uploadedImage ? <div className="previous-job-preview"><img src={uploadedImage} alt="Selected watermarked output" /><div><strong>{jobs.find((job) => job.job_id === sourceJobId)?.label ?? `Job ${sourceJobId}`}</strong><span>{jobs.find((job) => job.job_id === sourceJobId)?.prompt ?? 'Selected watermarked image'}</span></div></div> : null}
             </> : null}
 
             <div className="field-row">
-              <label className="field"><span>{selectedMethod.id === 'sfwmark' ? 'Watermark variant' : selectedSubmethod.payload}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} />}</label>
+              <label className="field"><span>{messageFieldLabel}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} />}</label>
               <label className="field small-field"><span>Seed</span><input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration} /></label>
             </div>
 
-            <section className="method-explainer" aria-label={`${selectedMethod.name} explanation`}><div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div><div className="latent-facts"><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>{selectedMethod.id === 'sfwmark' ? <div className="workflow-chain" aria-label="SFWMark latent workflow">{['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image', 'DDIM inversion', 'Extraction / identification'].map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div> : null}</section>
+            <section className="method-explainer" aria-label={`${selectedMethod.name} explanation`}><div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div><div className="latent-facts"><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div><div className="workflow-contract" aria-label={`${selectedWorkflow.label} inputs and outputs`}><div><span>Needs</span><ul>{selectedWorkflow.inputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Returns</span><ul>{selectedWorkflow.outputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Repository context</span><p>{selectedWorkflow.source}</p></div></div>{selectedMethod.id === 'sfwmark' ? <div className="workflow-chain" aria-label="SFWMark latent workflow">{['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image', 'DDIM inversion', 'Extraction / identification'].map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div> : null}</section>
 
             <div className="repo-defaults" aria-label="Repository defaults">{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>
           </div>

@@ -37,7 +37,30 @@ def assign_job_number(project_root: Path, job_id: str, job_dir: Path) -> int:
     return next_number
 
 
-def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
+def record_generation_job(project_root: Path, job_id: str, request: Any) -> int:
+    """Persist the common history fields for a completed repository run."""
+    job_dir = storage_root(project_root) / "outputs" / job_id
+    metadata_path = job_dir / "metadata.json"
+    metadata = _read_json(metadata_path)
+    metadata.update(
+        {
+            "method": request.method,
+            "submethod_id": request.submethod_id,
+            "workflow": "generate",
+        }
+    )
+    metadata.setdefault("message", request.message)
+    metadata.setdefault("prompt", request.prompt)
+    metadata.setdefault("seed", request.seed)
+    _write_json(metadata_path, metadata)
+    return assign_job_number(project_root, job_id, job_dir)
+
+
+def list_generation_jobs(
+    project_root: Path,
+    method_id: str | None = None,
+    submethod_id: str | None = None,
+) -> list[dict[str, Any]]:
     outputs_root = storage_root(project_root) / "outputs"
     if not outputs_root.is_dir():
         return []
@@ -48,8 +71,6 @@ def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
         if job_dir.is_dir()
         and (job_dir / "metadata.json").is_file()
         and (job_dir / "watermarked.png").is_file()
-        and (job_dir / "pattern_list-2048.pt").is_file()
-        and (job_dir / "identify_gt_indices_1.npy").is_file()
     ]
 
     for job_dir in sorted(candidates, key=lambda path: path.stat().st_mtime):
@@ -58,19 +79,53 @@ def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
     jobs = []
     for job_dir in sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True):
         metadata = _read_json(job_dir / "metadata.json")
+        resolved_method = metadata.get("method") or _infer_method(metadata, job_dir)
+        resolved_submethod = metadata.get("submethod_id") or _infer_submethod(metadata, resolved_method)
+        if method_id and resolved_method != method_id:
+            continue
+        if submethod_id and resolved_submethod != submethod_id:
+            continue
         jobs.append(
             {
                 "job_id": job_dir.name,
                 "job_number": metadata.get("job_number"),
-                "label": f"Job #{metadata.get('job_number', '?')} - {metadata.get('wm_type', 'SFWMark')}",
+                "label": f"Job #{metadata.get('job_number', '?')} - {resolved_method} / {resolved_submethod}",
                 "prompt": metadata.get("prompt", ""),
-                "wm_type": metadata.get("wm_type", "HSQR"),
+                "method": resolved_method,
+                "submethod_id": resolved_submethod,
+                "wm_type": metadata.get("wm_type"),
+                "message": metadata.get("message"),
                 "model_id": metadata.get("model_id"),
                 "created_at": metadata.get("created_at"),
                 "image_url": f"/files/outputs/{job_dir.name}/watermarked.png",
             }
         )
     return jobs
+
+
+def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
+    """Backward-compatible SFWMark history view."""
+    return list_generation_jobs(project_root, method_id="sfwmark")
+
+
+def _infer_method(metadata: dict[str, Any], job_dir: Path) -> str:
+    if metadata.get("wm_type") or (job_dir / "pattern_list-2048.pt").is_file():
+        return "sfwmark"
+    if metadata.get("coding"):
+        return "gaussian-shannon"
+    if metadata.get("config") == "configs/SD14_LaWa_inference.yaml":
+        return "lawa"
+    return "unknown"
+
+
+def _infer_submethod(metadata: dict[str, Any], method_id: str) -> str:
+    if method_id == "sfwmark":
+        return str(metadata.get("wm_type", "HSQR")).lower()
+    if method_id == "gaussian-shannon":
+        return str(metadata.get("coding", "gaussian"))
+    if method_id == "lawa":
+        return "lawa-48"
+    return ""
 
 
 def _max_existing_job_number(root: Path) -> int:

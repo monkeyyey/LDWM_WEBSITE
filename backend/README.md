@@ -36,7 +36,7 @@ pnpm dev
 ```text
 GET  /health
 GET  /methods
-GET  /jobs              # SFWMark generated jobs with detection artifacts
+GET  /jobs              # generated jobs; filter with ?method=...&submethod=...
 POST /watermark/generate
 POST /detect
 GET  /files/<path>      # generated watermarked images and job artifacts
@@ -78,6 +78,18 @@ The website presents the same three conceptual actions for every method:
 The API surface is limited to the repository-backed generation and analysis
 workflows described above. It does not advertise secondary attack or quality
 experiments as product actions.
+
+Generation history is stored per method and submethod. For example:
+
+```text
+GET /jobs?method=gaussian-shannon&submethod=ldpc
+GET /jobs?method=lawa&submethod=lawa-48
+GET /jobs?method=sfwmark&submethod=hsqr
+```
+
+An analysis request may use the selected generation's `sourceJobId`. The
+source job identifies the compatible image and repository artifacts; it is not
+interchangeable across methods or submethods.
 
 ## Repository Environments
 

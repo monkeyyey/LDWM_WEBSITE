@@ -6,9 +6,9 @@ import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
-from job_store import list_sfwmark_jobs
+from job_store import list_generation_jobs
 from registry import MethodRegistry
 from schemas import WatermarkRequest
 
@@ -34,7 +34,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json({"methods": REGISTRY.list_methods()})
             return
         if path == "/jobs":
-            self._json({"jobs": list_sfwmark_jobs(PROJECT_ROOT)})
+            query = parse_qs(urlparse(self.path).query)
+            method_id = query.get("method", [None])[0]
+            submethod_id = query.get("submethod", [None])[0]
+            self._json({"jobs": list_generation_jobs(PROJECT_ROOT, method_id, submethod_id)})
             return
         if path.startswith("/files/"):
             self._serve_storage_file(path)

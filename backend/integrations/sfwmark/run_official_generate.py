@@ -73,6 +73,8 @@ def main() -> int:
         json.dumps(
             {
                 "runner": "official-sfwmark",
+                "method": "sfwmark",
+                "submethod_id": wm_type.lower(),
                 "sfwmark_repo": str(sfw_dir),
                 "prompt": args.prompt,
                 "wm_type": args.wm_type,

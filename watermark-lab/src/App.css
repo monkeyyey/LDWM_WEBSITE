@@ -428,6 +428,52 @@ textarea:focus {
   padding-top: 12px;
 }
 
+.workflow-contract {
+  border-top: 1px solid #edf2ef;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 12px;
+}
+
+.workflow-contract > div + div {
+  border-left: 1px solid #edf2ef;
+  padding-left: 12px;
+}
+
+.workflow-contract ul {
+  color: #5f5f59;
+  display: grid;
+  font-size: 12px;
+  gap: 4px;
+  line-height: 1.35;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.workflow-contract li::before {
+  color: #679688;
+  content: '•';
+  margin-right: 6px;
+}
+
+.workflow-contract p {
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.workflow-unavailable {
+  color: #7a4f00;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 7px 0 0;
+}
+
+.workflow-unavailable strong {
+  color: #5f3f00;
+}
+
 .workflow-chain {
   align-items: stretch;
   border-top: 1px solid #edf2ef;
@@ -772,12 +818,20 @@ input[type='range'] {
   .navigation-group,
   .main-grid,
   .field-row,
-  .metric-grid {
+  .metric-grid,
+  .workflow-contract {
     grid-template-columns: 1fr;
   }
 
   .result-panel {
     grid-column: auto;
+  }
+
+  .workflow-contract > div + div {
+    border-left: 0;
+    border-top: 1px solid #edf2ef;
+    padding-left: 0;
+    padding-top: 12px;
   }
 }
 

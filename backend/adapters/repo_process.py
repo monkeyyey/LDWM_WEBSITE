@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from schemas import WatermarkRequest, WatermarkResult
+from job_store import record_generation_job
 
 
 def save_image_input(project_root: Path, request: WatermarkRequest, job_id: str) -> Path | None:
@@ -113,6 +114,8 @@ def run_repo_script(
     image_url = _storage_url(project_root, payload.get("image_path"))
     raw = payload.get("raw") if isinstance(payload.get("raw"), dict) else {}
     raw.update({"command": command, "runner_stdout": completed.stdout[-4000:]})
+    if request.workflow == "generate" and payload.get("status", "completed") == "completed" and image_url:
+        raw["job_number"] = record_generation_job(project_root, job_id, request)
     return WatermarkResult(
         job_id=job_id,
         method=request.method,
