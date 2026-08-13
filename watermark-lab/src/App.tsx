@@ -128,6 +128,8 @@ const lawaWorkflows: WorkflowSpec[] = [
   { id: 'identify', label: 'Identification', description: 'The upstream LaWa repo has no candidate-key identification workflow.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'LaWa decodes a message but does not search a candidate-key bank.' },
 ]
 
+const gaussianZeroMessage = '0'.repeat(256)
+
 const methods: Method[] = [
   {
     id: 'sfwmark',
@@ -151,8 +153,8 @@ const methods: Method[] = [
     bestFor: 'Message verification and bit error measurement after inversion.',
     color: '#7a4f00',
     submethods: [
-      { id: 'gaussian', name: 'Gaussian coding', description: 'Gaussian diffusion of the message with spatial redundancy and majority-vote decoding.', payload: '256-bit message', defaultMessage: '256-bit zero message', repoDefaults: ['encoder: Gaussian', 'message: 256 bits', 'redundancy: 64'], workflows: gaussianWorkflows },
-      { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting code with pseudo-random sign flips, redundancy, and a majority-vote fallback.', payload: '256-bit message', defaultMessage: '256-bit zero message', repoDefaults: ['encoder: LDPC', 'message: 256 bits', 'code rate: 0.25'], workflows: gaussianWorkflows },
+      { id: 'gaussian', name: 'Gaussian coding', description: 'Gaussian diffusion of the message with spatial redundancy and majority-vote decoding.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: Gaussian', 'message: 256 bits', 'redundancy: 64'], workflows: gaussianWorkflows },
+      { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting code with pseudo-random sign flips, redundancy, and a majority-vote fallback.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: LDPC', 'message: 256 bits', 'code rate: 0.25'], workflows: gaussianWorkflows },
     ],
   },
   {
@@ -196,11 +198,12 @@ function App() {
   const isGeneration = selectedWorkflow.id === 'generate'
   const needsImage = !isGeneration
   const isSfwAnalysis = selectedMethod.id === 'sfwmark' && !isGeneration
+  const messageLockedToJob = !isGeneration && selectedMethod.id !== 'sfwmark' && Boolean(sourceJobId)
   const messageFieldLabel = selectedMethod.id === 'sfwmark'
     ? 'Watermark variant'
     : selectedMethod.id === 'gaussian-shannon'
-      ? 'Message (256 binary bits; "256-bit zero message" means all zeros)'
-      : 'Message (48 binary bits)'
+      ? messageLockedToJob ? 'Embedded message (256 bits; linked job)' : 'Expected message (256 binary bits)'
+      : messageLockedToJob ? 'Embedded message (48 bits; linked job)' : 'Expected message (48 binary bits)'
 
   const loadJobs = useCallback(async () => {
     try {
@@ -421,7 +424,7 @@ function App() {
             </> : null}
 
             <div className="field-row">
-              <label className="field"><span>{messageFieldLabel}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} />}</label>
+              <label className="field"><span>{messageFieldLabel}</span>{selectedMethod.id === 'sfwmark' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={messageLockedToJob} readOnly={messageLockedToJob} />}</label>
               <label className="field small-field"><span>Seed</span><input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration} /></label>
             </div>
 

@@ -94,13 +94,24 @@ def list_generation_jobs(
                 "method": resolved_method,
                 "submethod_id": resolved_submethod,
                 "wm_type": metadata.get("wm_type"),
-                "message": metadata.get("message"),
+                "message": _display_message(metadata.get("message"), resolved_method),
                 "model_id": metadata.get("model_id"),
                 "created_at": metadata.get("created_at"),
                 "image_url": f"/files/outputs/{job_dir.name}/watermarked.png",
             }
         )
     return jobs
+
+
+def _display_message(message: Any, method_id: str) -> str | None:
+    """Normalize repository metadata before it reaches the frontend."""
+    if message is None:
+        return None
+    if method_id != "gaussian-shannon":
+        return str(message)
+    if isinstance(message, list):
+        return "".join(str(int(bit)) for bit in message)
+    return str(message)
 
 
 def list_sfwmark_jobs(project_root: Path) -> list[dict[str, Any]]:
