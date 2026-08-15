@@ -82,12 +82,17 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def _json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         encoded = json.dumps(payload, indent=2).encode("utf-8")
-        self.send_response(status)
-        self._send_cors_headers()
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(encoded)))
-        self.end_headers()
-        self.wfile.write(encoded)
+        try:
+            self.send_response(status)
+            self._send_cors_headers()
+            self.send_header("content-type", "application/json; charset=utf-8")
+            self.send_header("content-length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError):
+            # The client or reverse proxy may cancel a long-running request
+            # before the repository runner finishes. There is no response to send.
+            return
 
     def _send_cors_headers(self) -> None:
         self.send_header("access-control-allow-origin", "*")

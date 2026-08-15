@@ -196,6 +196,7 @@ function App() {
   const [selectedJobId, setSelectedJobId] = useState('')
   const [result, setResult] = useState<Result>({ status: 'idle', workflow: 'generate', title: 'Ready', score: 0, bits: '--', runtime: '--', notes: 'Choose a method, submethod, and workflow, then run the repository-backed action.', imageUrl: null })
   const runTokenRef = useRef(0)
+  const requestInFlightRef = useRef(false)
 
   const selectedMethod = useMemo(() => methods.find((method) => method.id === methodId) ?? methods[0], [methodId])
   const selectedSubmethod = useMemo(() => selectedMethod.submethods.find((submethod) => submethod.id === submethodId) ?? selectedMethod.submethods[0], [selectedMethod, submethodId])
@@ -283,6 +284,8 @@ function App() {
   }
 
   async function runBackendJob(workflow: WorkflowId = selectedWorkflow.id) {
+    if (requestInFlightRef.current) return
+    requestInFlightRef.current = true
     const runToken = ++runTokenRef.current
     const requestMethodId = methodId
     const workflowSpec = selectedSubmethod.workflows.find((item) => item.id === workflow) ?? selectedWorkflow
@@ -340,6 +343,8 @@ function App() {
       }
     } catch (error) {
       setResult({ status: 'done', workflow, title: 'Backend not reachable', score: 0, bits: '--', runtime: '--', notes: `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase}.`, imageUrl: null, isError: true })
+    } finally {
+      requestInFlightRef.current = false
     }
   }
 
@@ -404,7 +409,7 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div><p className="eyebrow">Repository workflow dashboard</p><h2>Explore latent-domain watermarking methods and their actual evaluation paths</h2></div>
-          <div className="run-controls"><button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run"><RotateCcw size={18} /></button><button className="primary-button" onClick={() => runBackendJob()} type="button"><Play size={18} />Run</button></div>
+          <div className="run-controls"><button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run"><RotateCcw size={18} /></button><button className="primary-button" disabled={result.status === 'running'} onClick={() => runBackendJob()} type="button"><Play size={18} />Run</button></div>
         </header>
 
         <section className="method-grid" aria-label="Watermark repositories">
