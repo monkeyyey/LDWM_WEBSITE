@@ -108,7 +108,11 @@ def extract(args, torch, Image, DDIMInverseScheduler, StableDiffusionPipeline, g
             raise RuntimeError("LDPC extraction needs the generation job state containing H and G")
         from scipy import sparse
 
-        H = sparse.load_npz(state_dir / "ldpc_H.npz")
+        # pyldpc 0.7.9 performs dimension arithmetic with NumPy matrix
+        # values when H is sparse. The in-memory matrix returned by
+        # make_ldpc is accepted correctly, so restore H as a dense ndarray
+        # before passing it back to the repository decoder.
+        H = sparse.load_npz(state_dir / "ldpc_H.npz").toarray()
         G = np.load(state_dir / "ldpc_G.npy", allow_pickle=False)
         decoded, _ = ldpc_decode(final_tensor, H, G, redundancy, table_decision=True, snr=0)
         decoded = decoded[0]
