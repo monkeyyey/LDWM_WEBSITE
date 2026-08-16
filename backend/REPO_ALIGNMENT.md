@@ -46,6 +46,37 @@ Repository: `work/repos/LaWa`
 The extraction runner loads the same LaWa model and calls its `model.decoder`
 path. It does not claim arbitrary-image watermark embedding.
 
+## Gaussian Shading
+
+Repository: `work/repos/Gaussian-Shading`
+
+- Generation uses the upstream `Gaussian_Shading` or
+  `Gaussian_Shading_chacha` class. The class generates the watermark and key,
+  diffuses the bits with the configured copy factors, and creates the initial
+  latent through truncated-Gaussian sampling.
+- Verification follows the upstream empty-prompt DDIM inversion and
+  `eval_watermark` logic. The app reports recovered bit accuracy, BER, and the
+  separate detection and multi-user traceability threshold decisions.
+- The simple and ChaCha20 variants are separate submethods because the upstream
+  README states that the simple randomization is not strictly
+  performance-lossless.
+- Traceability is a thresholded known-watermark test. The repository does not
+  search a candidate key bank, so identification is unavailable.
+
+## PRC-Watermark
+
+Repository: `work/repos/PRC-Watermark`
+
+- Generation follows `encode.py`: `KeyGen`, `Encode` without a supplied user
+  message, pseudogaussian sampling, and Stable Diffusion generation.
+- Verification follows `decode.py`: exact inversion with an empty prompt,
+  posterior recovery with variance 1.5 by default, `Detect`, `Decode`, and the
+  final `Detect OR Decode-valid` decision.
+- The released product result is binary. The website does not present PRC as a
+  long-message extractor or candidate-bank identifier.
+- Verification requires the decoding key stored with a compatible generation
+  job.
+
 ## Product Boundary
 
 These repositories watermark during generation. The shared app therefore

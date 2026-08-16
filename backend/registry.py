@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from adapters import GaussianShannonAdapter, LawaAdapter, SfwmarkAdapter
+from adapters import GaussianShadingAdapter, GaussianShannonAdapter, LawaAdapter, PrcWatermarkAdapter, SfwmarkAdapter
 from adapters.base import ModelAdapter
 
 
@@ -11,6 +11,8 @@ ADAPTERS = {
     "sfwmark": SfwmarkAdapter,
     "gaussian-shannon": GaussianShannonAdapter,
     "lawa": LawaAdapter,
+    "gaussian-shading": GaussianShadingAdapter,
+    "prc-watermark": PrcWatermarkAdapter,
 }
 
 

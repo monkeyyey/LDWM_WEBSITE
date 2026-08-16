@@ -55,5 +55,46 @@
     "payload": "exactly 48 binary bits for the provided pretrained decoder",
     "environment": "conda env create -f environment.yml; tested with python 3.8.17, pytorch 2.0.1, cuda 11.3",
     "notes": "In-generation image watermarking through Stable Diffusion v1.4 and a modified decoder. Public script does not expose arbitrary uploaded-image embedding."
+  },
+  "gaussian-shading": {
+    "name": "Gaussian Shading",
+    "category": "Distribution-preserving Gaussian latent watermark",
+    "repo_path": "../work/repos/Gaussian-Shading",
+    "native_workflows": ["generate", "verify", "robustness_evaluation"],
+    "adapter_workflows": ["generate", "verification"],
+    "analysis_workflows": ["bit_accuracy", "detection_threshold", "traceability_threshold"],
+    "not_native": ["candidate_bank_identification", "post_hoc_upload_watermark"],
+    "default_config": {
+      "model_id": "sd2-community/stable-diffusion-2-1-base",
+      "channel_copy": 1,
+      "hw_copy": 8,
+      "message_bits": 256,
+      "fpr": 0.000001,
+      "user_number": 1000000,
+      "variants": ["simple", "chacha"]
+    },
+    "payload": "repository-generated 256-bit watermark diffused across a 1 x 4 x 64 x 64 Gaussian latent",
+    "environment": "separate Python environment with the upstream Gaussian-Shading checkout and CUDA",
+    "notes": "Generation uses distribution-preserving truncated-Gaussian sampling. Verification uses empty-prompt DDIM inversion, the saved key, bit accuracy, and the repository's detection and traceability thresholds."
+  },
+  "prc-watermark": {
+    "name": "PRC-Watermark",
+    "category": "Pseudorandom-code Gaussian latent watermark",
+    "repo_path": "../work/repos/PRC-Watermark",
+    "native_workflows": ["generate", "detect", "decode"],
+    "adapter_workflows": ["generate", "verification"],
+    "analysis_workflows": ["binary_detection", "decode_validity", "combined_decision"],
+    "not_native": ["candidate_bank_identification", "long_message_interface", "post_hoc_upload_watermark"],
+    "default_config": {
+      "model_id": "sd2-community/stable-diffusion-2-1-base",
+      "codeword_length": 16384,
+      "fpr": 0.00001,
+      "prc_t": 3,
+      "posterior_variance": 1.5,
+      "inversion_order": 0
+    },
+    "payload": "keyed PRC codeword with binary watermark-present or watermark-absent output",
+    "environment": "separate Python environment with the upstream PRC-Watermark checkout and CUDA",
+    "notes": "The released script generates a random PRC payload and reports Detect, Decode-valid, and their OR-combined binary decision. It does not expose candidate-bank identification."
   }
 }

@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -14,6 +14,7 @@ class WatermarkRequest:
     image_name: str | None = None
     image_data_url: str | None = None
     source_job_id: str | None = None
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

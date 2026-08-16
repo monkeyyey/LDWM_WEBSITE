@@ -1,14 +1,15 @@
 # Unified Watermark Backend
 
-This backend is an API gateway over three repository-specific implementations:
+This backend is an API gateway over five repository-specific implementations:
 
 ```text
 frontend -> normalized API -> method adapter -> repository runner
 ```
 
 The adapters do not invent a common watermark algorithm. They translate the
-shared request into the original SFWMark, Gaussian-Shannon, or LaWa workflow,
-run it in that repository's environment, and normalize its output.
+shared request into the original SFWMark, Gaussian-Shannon, LaWa, Gaussian
+Shading, or PRC-Watermark workflow, run it in that repository's environment,
+and normalize its output.
 
 ## Run
 
@@ -53,7 +54,8 @@ All POST requests use the same fields where applicable:
   "message": "HSQR",
   "seed": 42,
   "imageDataUrl": null,
-  "sourceJobId": null
+  "sourceJobId": null,
+  "options": {}
 }
 ```
 
@@ -70,10 +72,17 @@ The website presents the same three conceptual actions for every method:
 - **Verification** maps to the repository's actual analysis: SFWMark compares
   the inverted latent with the expected Fourier pattern; Gaussian-Shannon and
   LaWa extract the message and report bit-level recovery.
+- **Gaussian Shading verification** decrypts and majority-votes the inverted
+  latent, then reports bit accuracy, BER, and the repository's separate
+  detection and multi-user traceability threshold decisions.
+- **PRC-Watermark verification** reports the released repository's statistical
+  `Detect` result, whether `Decode` returned a valid payload, and their
+  OR-combined binary decision.
 - **Identification** is available for SFWMark only. It searches the 2048-pattern
   candidate bank and compares the predicted index with the ground-truth index.
-  The Gaussian-Shannon and LaWa repositories do not provide a candidate-bank
-  identification workflow, so the UI leaves that action unavailable.
+  Gaussian-Shannon, LaWa, Gaussian Shading, and PRC-Watermark do not provide a
+  candidate-bank identification workflow, so the UI leaves that action
+  unavailable for those methods.
 
 The API surface is limited to the repository-backed generation and analysis
 workflows described above. It does not advertise secondary attack or quality
@@ -85,6 +94,8 @@ Generation history is stored per method and submethod. For example:
 GET /jobs?method=gaussian-shannon&submethod=ldpc
 GET /jobs?method=lawa&submethod=lawa-48
 GET /jobs?method=sfwmark&submethod=hsqr
+GET /jobs?method=gaussian-shading&submethod=chacha
+GET /jobs?method=prc-watermark&submethod=prc
 ```
 
 An analysis request may use the selected generation's `sourceJobId`. The
@@ -106,6 +117,12 @@ does not report a synthetic completed result.
   Stable Diffusion 2.1-base checkpoint.
 - `WATERMARK_LAWA_PYTHON`: Python executable for LaWa.
 - `WATERMARK_DEVICE`: optional Torch device override for Gaussian-Shannon.
+- `WATERMARK_GSHADING_REPO`: optional Gaussian Shading checkout override.
+- `WATERMARK_GSHADING_PYTHON`: Python executable for Gaussian Shading.
+- `WATERMARK_GSHADING_MODEL_ID`: optional model override for Gaussian Shading.
+- `WATERMARK_PRC_REPO`: optional PRC-Watermark checkout override.
+- `WATERMARK_PRC_PYTHON`: Python executable for PRC-Watermark.
+- `WATERMARK_PRC_MODEL_ID`: optional model override for PRC-Watermark.
 
 The checked-out repositories expected by the default configuration are:
 
@@ -113,6 +130,8 @@ The checked-out repositories expected by the default configuration are:
 work/repos/SFWMark
 work/repos/Gaussian-Shannon
 work/repos/LaWa
+work/repos/Gaussian-Shading
+work/repos/PRC-Watermark
 ```
 
 Gaussian-Shannon setup can be prepared with. Conda is used when available;
@@ -137,6 +156,17 @@ listed by the upstream requirements file.
 Setup helpers for SFWMark live in
 `backend/integrations/sfwmark/setup_sfwmark.sh`. The direct smoke scripts in
 that directory exercise official generation and detection without the browser.
+
+Gaussian Shading and PRC-Watermark use isolated environments because their
+upstream Diffusers and Torch versions differ from the other methods:
+
+```bash
+bash backend/integrations/gaussian_shading/setup_gaussian_shading.sh
+bash backend/integrations/prc_watermark/setup_prc_watermark.sh
+```
+
+Each helper prints the repository, Python, and model environment values to add
+to the backend systemd `EnvironmentFile`.
 
 ## SFWMark Output Contract
 

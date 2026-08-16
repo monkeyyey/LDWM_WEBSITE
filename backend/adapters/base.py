@@ -17,6 +17,8 @@ class ModelAdapter:
             "sfwmark": "SFWMARK_REPO",
             "gaussian-shannon": "WATERMARK_GS_REPO",
             "lawa": "WATERMARK_LAWA_REPO",
+            "gaussian-shading": "WATERMARK_GSHADING_REPO",
+            "prc-watermark": "WATERMARK_PRC_REPO",
         }.get(method_id)
         override = os.environ.get(env_name) if env_name else None
         configured_path = (project_root / "backend" / config["repo_path"]).resolve()

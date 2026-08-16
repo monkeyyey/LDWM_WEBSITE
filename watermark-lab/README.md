@@ -1,17 +1,22 @@
 # Watermark Lab
 
-The frontend is a single environment for exploring three upstream latent-domain
+The frontend is a single environment for exploring five upstream latent-domain
 watermark repositories:
 
 - SFWMark: HSQR and HSTR Fourier latent watermarking.
 - Gaussian-Shannon: Gaussian and LDPC coded message watermarking.
 - LaWa: the repository's pretrained 48-bit configuration.
+- Gaussian Shading: simple XOR and ChaCha20 distribution-preserving Gaussian
+  latent variants.
+- PRC-Watermark: keyed pseudorandom-code generation and binary verification.
 
 Each method is organized around Generation, Verification, and Identification.
 Verification keeps the repository's own meaning: Fourier-pattern comparison for
 SFWMark, message extraction and BER/accuracy for Gaussian-Shannon and LaWa.
 Identification is disabled where the upstream repository has no candidate-key
-identification procedure.
+identification procedure. Gaussian Shading's thresholded traceability metric
+and PRC's keyed binary decision are represented as verification, not relabeled
+as candidate-bank identification.
 
 ## Run
 

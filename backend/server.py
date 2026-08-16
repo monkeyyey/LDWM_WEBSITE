@@ -109,6 +109,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         if file_path.name == "clean.png":
             self._json({"error": "Clean comparison images are not available"}, status=HTTPStatus.NOT_FOUND)
             return
+        if file_path.suffix.lower() in {".bin", ".npy", ".npz", ".pkl", ".pt"}:
+            self._json({"error": "Private generation artifacts are not downloadable"}, status=HTTPStatus.NOT_FOUND)
+            return
         if not file_path.is_file():
             self._json({"error": "File not found"}, status=HTTPStatus.NOT_FOUND)
             return

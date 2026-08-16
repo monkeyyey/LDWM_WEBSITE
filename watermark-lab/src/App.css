@@ -172,7 +172,7 @@ button {
 .method-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 18px;
 }
 
@@ -375,6 +375,18 @@ textarea:focus {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr 110px;
+}
+
+.option-grid {
+  border: 1px solid #eeeeea;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 12px;
+}
+
+.option-grid .field span {
+  font-size: 12px;
 }
 
 .repo-defaults {
@@ -824,6 +836,12 @@ input[type='range'] {
   border-color: #171717;
 }
 
+@media (max-width: 1200px) {
+  .method-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .workspace {
     padding: 28px 18px 36px;
@@ -852,6 +870,10 @@ input[type='range'] {
     grid-template-columns: 1fr;
   }
 
+  .option-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .result-panel {
     grid-column: auto;
   }
@@ -865,6 +887,10 @@ input[type='range'] {
 }
 
 @media (max-width: 600px) {
+  .option-grid {
+    grid-template-columns: 1fr;
+  }
+
   .workflow-chain {
     display: grid;
     overflow-x: visible;

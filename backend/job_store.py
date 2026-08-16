@@ -107,7 +107,7 @@ def _display_message(message: Any, method_id: str) -> str | None:
     """Normalize repository metadata before it reaches the frontend."""
     if message is None:
         return None
-    if method_id != "gaussian-shannon":
+    if method_id not in {"gaussian-shannon", "gaussian-shading"}:
         return str(message)
     if isinstance(message, list):
         return "".join(str(int(bit)) for bit in message)
@@ -126,6 +126,10 @@ def _infer_method(metadata: dict[str, Any], job_dir: Path) -> str:
         return "gaussian-shannon"
     if metadata.get("config") == "configs/SD14_LaWa_inference.yaml":
         return "lawa"
+    if metadata.get("gaussian_shading_variant"):
+        return "gaussian-shading"
+    if metadata.get("prc_t"):
+        return "prc-watermark"
     return "unknown"
 
 
@@ -136,6 +140,10 @@ def _infer_submethod(metadata: dict[str, Any], method_id: str) -> str:
         return str(metadata.get("coding", "gaussian"))
     if method_id == "lawa":
         return "lawa-48"
+    if method_id == "gaussian-shading":
+        return str(metadata.get("gaussian_shading_variant", "chacha"))
+    if method_id == "prc-watermark":
+        return "prc"
     return ""
 
 
