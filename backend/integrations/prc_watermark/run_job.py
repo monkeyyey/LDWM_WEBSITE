@@ -28,7 +28,7 @@ def main() -> int:
         if args.operation == "generate":
             result = generate_image(args, torch, KeyGen, Encode, prc_gaussians, stable_diffusion_pipe, generate)
         else:
-            result = verify_image(args, torch, Image, Detect, Decode, prc_gaussians, stable_diffusion_pipe, exact_inversion)
+            result = analyze_image(args, torch, Image, Detect, Decode, prc_gaussians, stable_diffusion_pipe, exact_inversion)
     except Exception as exc:
         result = {
             "status": "failed",
@@ -83,6 +83,8 @@ def generate_image(args, torch, KeyGen, Encode, prc_gaussians, stable_diffusion_
         "prc_t": args.prc_t,
         "posterior_variance": args.posterior_variance,
         "codeword_length": codeword_length,
+        "posterior_length": codeword_length,
+        "message_available": False,
         "solver_order": 1,
         "inversion_order": 0,
     }
@@ -96,9 +98,9 @@ def generate_image(args, torch, KeyGen, Encode, prc_gaussians, stable_diffusion_
     }
 
 
-def verify_image(args, torch, Image, Detect, Decode, prc_gaussians, stable_diffusion_pipe, exact_inversion):
+def analyze_image(args, torch, Image, Detect, Decode, prc_gaussians, stable_diffusion_pipe, exact_inversion):
     if not args.image or not args.state_dir:
-        raise ValueError("PRC verification requires an image and generation state")
+        raise ValueError("PRC Detect or Decode requires an image and generation state")
     state_dir = Path(args.state_dir).resolve()
     metadata = read_metadata(state_dir)
     if metadata.get("method") != "prc-watermark":
@@ -123,26 +125,70 @@ def verify_image(args, torch, Image, Detect, Decode, prc_gaussians, stable_diffu
         reversed_latents.to(torch.float64).flatten().cpu(),
         variances=float(metadata["posterior_variance"]),
     ).flatten().cpu()
-    detection_result = bool(Detect(decoding_key, posteriors))
+    key_fpr = float(decoding_key[3])
+    noise_rate = float(decoding_key[4])
+    test_bit_count = int(len(decoding_key[5]))
+    max_bp_iter = int(decoding_key[7])
+    detection_result = None
+    if args.operation in {"detect", "verify"}:
+        detection_result = bool(Detect(decoding_key, posteriors))
+    common_raw = {
+        "fpr": key_fpr,
+        "prc_t": metadata["prc_t"],
+        "posterior_variance": metadata["posterior_variance"],
+        "codeword_length": metadata["codeword_length"],
+        "posterior_length": int(posteriors.numel()),
+        "noise_rate": noise_rate,
+        "test_bit_count": test_bit_count,
+        "max_bp_iter": max_bp_iter,
+        "message_available": False,
+        "latent_shape": [1, 4, 64, 64],
+        "inversion_order": metadata["inversion_order"],
+        "inversion_prompt": "",
+    }
+    if args.operation == "detect":
+        return {
+            "status": "completed",
+            "detection_score": 100 if detection_result else 0,
+            "recovered_payload": "watermark detected" if detection_result else "watermark not detected",
+            "raw": {
+                **common_raw,
+                "operation": "detect",
+                "detection_result": detection_result,
+                "decoder": "statistical parity-check threshold",
+                "decision_rule": "Detect",
+            },
+        }
+
     decoded = Decode(decoding_key, posteriors)
     decoding_result = decoded is not None
-    combined_result = detection_result or decoding_result
+    if args.operation == "decode":
+        return {
+            "status": "completed",
+            "detection_score": 100 if decoding_result else 0,
+            "recovered_payload": "decode valid" if decoding_result else "decode invalid",
+            "raw": {
+                **common_raw,
+                "operation": "decode",
+                "decoding_result": decoding_result,
+                "decoder": "belief propagation (product-sum)",
+                "decision_rule": "Decode validity",
+            },
+        }
+
+    combined_result = bool(detection_result) or decoding_result
     return {
         "status": "completed",
         "detection_score": 100 if combined_result else 0,
         "recovered_payload": "watermark detected" if combined_result else "watermark not detected",
         "raw": {
+            **common_raw,
+            "operation": "verify",
             "detection_result": detection_result,
             "decoding_result": decoding_result,
             "combined_result": combined_result,
+            "decoder": "Detect plus belief propagation (product-sum)",
             "decision_rule": "Detect OR Decode",
-            "fpr": metadata["fpr"],
-            "prc_t": metadata["prc_t"],
-            "posterior_variance": metadata["posterior_variance"],
-            "codeword_length": metadata["codeword_length"],
-            "latent_shape": [1, 4, 64, 64],
-            "inversion_order": metadata["inversion_order"],
-            "inversion_prompt": "",
         },
     }
 
@@ -165,7 +211,7 @@ def read_metadata(state_dir: Path) -> dict:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", required=True)
-    parser.add_argument("--operation", choices=["generate", "verify"], required=True)
+    parser.add_argument("--operation", choices=["generate", "detect", "decode", "verify"], required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--state-dir")
     parser.add_argument("--image")

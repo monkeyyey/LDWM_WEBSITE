@@ -37,9 +37,11 @@ fi
 
 run_python -m pip install --upgrade pip setuptools wheel
 run_python -m pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --index-url https://download.pytorch.org/whl/cu117
+# The web runtime does not use the upstream bulk-evaluation dataset loader.
+# Tokenizers 0.14.1 requires huggingface_hub < 0.18, so keep this stack together.
 run_python -m pip install \
-  diffusers==0.11.1 transformers==4.26.1 huggingface_hub==0.13.4 accelerate==0.17.1 safetensors==0.3.3 \
-  numpy==1.24.4 scipy==1.10.1 Pillow==9.5.0 matplotlib==3.7.5 datasets==2.18.0 \
+  diffusers==0.11.1 transformers==4.34.0 tokenizers==0.14.1 huggingface_hub==0.17.3 \
+  accelerate==0.23.0 safetensors==0.3.3 numpy==1.24.4 scipy==1.10.1 Pillow==9.5.0 matplotlib==3.7.5 \
   pycryptodome==3.20.0 tqdm==4.66.2
 
 run_python - <<'PY'

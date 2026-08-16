@@ -8,15 +8,16 @@ watermark repositories:
 - LaWa: the repository's pretrained 48-bit configuration.
 - Gaussian Shading: simple XOR and ChaCha20 distribution-preserving Gaussian
   latent variants.
-- PRC-Watermark: keyed pseudorandom-code generation and binary verification.
+- PRC-Watermark: keyed pseudorandom-code generation, Detect, and Decode.
 
 Each method is organized around Generation, Verification, and Identification.
 Verification keeps the repository's own meaning: Fourier-pattern comparison for
 SFWMark, message extraction and BER/accuracy for Gaussian-Shannon and LaWa.
 Identification is disabled where the upstream repository has no candidate-key
 identification procedure. Gaussian Shading's thresholded traceability metric
-and PRC's keyed binary decision are represented as verification, not relabeled
-as candidate-bank identification.
+and PRC's separate Detect and Decode operations are represented directly. The
+website does not add candidate-bank identification where the repositories do
+not implement it.
 
 ## Run
 

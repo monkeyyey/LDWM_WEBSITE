@@ -69,12 +69,15 @@ Repository: `work/repos/PRC-Watermark`
 
 - Generation follows `encode.py`: `KeyGen`, `Encode` without a supplied user
   message, pseudogaussian sampling, and Stable Diffusion generation.
-- Verification follows `decode.py`: exact inversion with an empty prompt,
-  posterior recovery with variance 1.5 by default, `Detect`, `Decode`, and the
-  final `Detect OR Decode-valid` decision.
+- Detect and Decode are separate analysis operations: both use exact inversion
+  with an empty prompt and posterior recovery with variance 1.5 by default;
+  Detect calls `Detect` and Decode calls `Decode` independently. The original
+  `decode.py` invokes both and calculates an optional `Detect OR Decode-valid`
+  decision, but the website does not collapse them into a generic verification
+  action.
 - The released product result is binary. The website does not present PRC as a
   long-message extractor or candidate-bank identifier.
-- Verification requires the decoding key stored with a compatible generation
+- Both operations require the decoding key stored with a compatible generation
   job.
 
 ## Product Boundary

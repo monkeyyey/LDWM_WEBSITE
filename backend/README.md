@@ -49,7 +49,7 @@ All POST requests use the same fields where applicable:
 {
   "method": "sfwmark",
   "submethodId": "hsqr",
-  "analysisMode": "verify",
+  "analysisMode": "detect",
   "prompt": "a ceramic mug on a desk",
   "message": "HSQR",
   "seed": 42,
@@ -65,19 +65,22 @@ edited image and runs that repository's extraction/detection path.
 
 ## Workflow Mapping
 
-The website presents the same three conceptual actions for every method:
+The website presents the native actions that each repository actually exposes:
 
 - **Generation** creates the watermarked image using the repository's native
   generation path.
-- **Verification** maps to the repository's actual analysis: SFWMark compares
+- **Analysis** maps to the repository's actual analysis: SFWMark compares
   the inverted latent with the expected Fourier pattern; Gaussian-Shannon and
   LaWa extract the message and report bit-level recovery.
 - **Gaussian Shading verification** decrypts and majority-votes the inverted
   latent, then reports bit accuracy, BER, and the repository's separate
   detection and multi-user traceability threshold decisions.
-- **PRC-Watermark verification** reports the released repository's statistical
-  `Detect` result, whether `Decode` returned a valid payload, and their
-  OR-combined binary decision.
+- **PRC-Watermark Detect** runs the released repository's statistical `Detect`
+  function on its own.
+- **PRC-Watermark Decode** runs the released repository's `Decode` function on
+  its own. The original `decode.py` invokes both operations and calculates an
+  optional `Detect OR Decode-valid` result, but the website keeps the two
+  repository operations separate.
 - **Identification** is available for SFWMark only. It searches the 2048-pattern
   candidate bank and compares the predicted index with the ground-truth index.
   Gaussian-Shannon, LaWa, Gaussian Shading, and PRC-Watermark do not provide a

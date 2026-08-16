@@ -82,8 +82,8 @@
     "category": "Pseudorandom-code Gaussian latent watermark",
     "repo_path": "../work/repos/PRC-Watermark",
     "native_workflows": ["generate", "detect", "decode"],
-    "adapter_workflows": ["generate", "verification"],
-    "analysis_workflows": ["binary_detection", "decode_validity", "combined_decision"],
+    "adapter_workflows": ["generate", "detect", "decode"],
+    "analysis_workflows": ["binary_detection", "decode_validity"],
     "not_native": ["candidate_bank_identification", "long_message_interface", "post_hoc_upload_watermark"],
     "default_config": {
       "model_id": "sd2-community/stable-diffusion-2-1-base",
@@ -95,6 +95,6 @@
     },
     "payload": "keyed PRC codeword with binary watermark-present or watermark-absent output",
     "environment": "separate Python environment with the upstream PRC-Watermark checkout and CUDA",
-    "notes": "The released script generates a random PRC payload and reports Detect, Decode-valid, and their OR-combined binary decision. It does not expose candidate-bank identification."
+    "notes": "The released script generates a random PRC payload. Detect and Decode are separate repository operations; decode.py reports both and also calculates an optional OR-combined decision. It does not expose candidate-bank identification."
   }
 }
