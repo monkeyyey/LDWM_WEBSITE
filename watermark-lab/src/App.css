@@ -88,7 +88,7 @@ button {
 }
 
 .primary-button,
-.icon-button,
+.reset-button,
 .method-card {
   align-items: center;
   border: 1px solid transparent;
@@ -117,9 +117,8 @@ button {
 }
 
 .workspace {
-  margin: 0 auto;
-  max-width: 1440px;
-  padding: 30px 28px 42px;
+  width: 100%;
+  padding: 30px 24px 42px;
 }
 
 .topbar {
@@ -136,12 +135,7 @@ button {
   max-width: 760px;
 }
 
-.run-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.icon-button,
+.reset-button,
 .primary-button {
   background: #ffffff;
   border-color: #d7d7d0;
@@ -150,20 +144,14 @@ button {
   padding: 0 14px;
 }
 
-.icon-button {
-  aspect-ratio: 1;
-  padding: 0;
-  width: 42px;
-}
-
 .primary-button {
   background: #171717;
   color: #ffffff;
   font-weight: 650;
-  min-width: 98px;
+  min-width: 148px;
 }
 
-.icon-button:hover,
+.reset-button:hover,
 .primary-button:hover,
 .method-card:hover {
   border-color: #171717;
@@ -296,11 +284,12 @@ button {
 .main-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(560px, 1.15fr);
+  grid-template-columns: minmax(520px, 1fr) minmax(520px, 1fr);
 }
 
 .control-panel,
 .preview-panel,
+.implementation-panel,
 .result-panel {
   background: #ffffff;
   border: 1px solid #deded8;
@@ -309,6 +298,7 @@ button {
 }
 
 .control-panel {
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -389,12 +379,40 @@ textarea:focus {
   font-size: 12px;
 }
 
-.repo-defaults {
+.form-actions {
+  align-items: center;
+  border-bottom: 1px solid #eeeeea;
   border-top: 1px solid #eeeeea;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 0;
+}
+
+.reset-button {
+  background: #ffffff;
+  border-color: #d7d7d0;
+  color: #4f4f49;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  padding: 0 14px;
+}
+
+.repo-defaults {
+  align-items: center;
+  border-top: 1px solid #edf2ef;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding-top: 12px;
+  padding: 12px 14px;
+}
+
+.repo-defaults > strong {
+  color: #5f5f59;
+  font-size: 11px;
+  margin-right: 2px;
+  text-transform: uppercase;
 }
 
 .repo-defaults span {
@@ -405,14 +423,14 @@ textarea:focus {
   padding: 5px 8px;
 }
 
-.method-explainer {
-  border: 1px solid #dfe9e4;
+.implementation-panel {
+  grid-column: 1 / -1;
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 0;
+  padding: 0;
 }
 
-.method-explainer span {
+.implementation-panel span {
   color: #5f5f59;
   display: block;
   font-size: 12px;
@@ -421,23 +439,33 @@ textarea:focus {
   text-transform: uppercase;
 }
 
-.method-explainer strong {
+.implementation-panel strong {
   color: #171717;
   display: block;
   font-size: 15px;
   line-height: 1.25;
 }
 
-.method-explainer p {
+.implementation-panel p {
   color: #5f5f59;
   font-size: 13px;
   line-height: 1.4;
   margin: 5px 0 0;
 }
 
-.latent-facts {
-  border-top: 1px solid #edf2ef;
-  padding-top: 12px;
+.implementation-summary {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.implementation-summary > div {
+  min-width: 0;
+  padding: 14px;
+}
+
+.implementation-summary > div + div {
+  border-left: 1px solid #edf2ef;
 }
 
 .workflow-contract {
@@ -445,7 +473,7 @@ textarea:focus {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding-top: 12px;
+  padding: 14px;
 }
 
 .workflow-contract > div + div {
@@ -486,35 +514,90 @@ textarea:focus {
   color: #5f3f00;
 }
 
-.workflow-chain {
+.process-map {
+  border-top: 1px solid #edf2ef;
+}
+
+.process-map-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px 14px 9px;
+}
+
+.process-map-heading p {
+  font-size: 12px;
+  margin: 0;
+  text-align: right;
+}
+
+.process-rows {
+  display: grid;
+}
+
+.process-row {
   align-items: stretch;
   border-top: 1px solid #edf2ef;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 100px minmax(0, 1fr);
+  padding: 10px 14px;
+}
+
+.process-row.selected {
+  background: #f6f8f7;
+  box-shadow: inset 4px 0 0 var(--method-color);
+}
+
+.process-label {
+  align-content: center;
+  display: grid;
+}
+
+.process-label span {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.process-label strong {
+  font-size: 13px;
+}
+
+.workflow-chain {
+  align-items: stretch;
   display: flex;
   gap: 0;
-  overflow-x: auto;
-  padding-top: 12px;
+  min-width: 0;
 }
 
 .workflow-item {
   align-items: center;
   display: flex;
   flex: 1 1 0;
-  min-width: 112px;
+  min-width: 0;
 }
 
 .workflow-step {
-  background: #edf6f2;
-  border: 1px solid #c8dfd5;
-  color: #275246;
+  background: #fafaf7;
+  border: 1px solid #deded8;
+  color: #343430;
   display: flex;
   flex: 1;
   font-size: 12px;
   justify-content: center;
   line-height: 1.25;
   min-height: 48px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 8px 9px;
   text-align: center;
   text-transform: none;
+}
+
+.process-row.selected .workflow-step {
+  background: #ffffff;
+  border-color: var(--method-color);
 }
 
 .workflow-arrow {
@@ -644,14 +727,15 @@ input[type='range'] {
 }
 
 .preview-panel {
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .image-stage {
-  aspect-ratio: 1 / 1;
   display: grid;
+  height: clamp(360px, 34vw, 500px);
   min-height: 0;
   overflow: hidden;
   place-items: center;
@@ -840,6 +924,14 @@ input[type='range'] {
   .method-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .main-grid {
+    grid-template-columns: minmax(420px, 0.95fr) minmax(480px, 1.05fr);
+  }
+
+  .process-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -870,6 +962,15 @@ input[type='range'] {
     grid-template-columns: 1fr;
   }
 
+  .implementation-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .implementation-summary > div + div {
+    border-left: 0;
+    border-top: 1px solid #edf2ef;
+  }
+
   .option-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -887,13 +988,54 @@ input[type='range'] {
 }
 
 @media (max-width: 600px) {
+  .sidebar {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px 18px;
+    position: static;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+  }
+
+  .sidebar-context,
+  .deployment {
+    border-top: 1px solid #deded8;
+    min-width: 0;
+    padding-top: 10px;
+  }
+
+  .topbar h2 {
+    font-size: 26px;
+  }
+
   .option-grid {
     grid-template-columns: 1fr;
   }
 
+  .image-stage {
+    height: 320px;
+  }
+
+  .process-map-heading,
+  .form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .process-map-heading p {
+    text-align: left;
+  }
+
+  .form-actions .primary-button,
+  .form-actions .reset-button {
+    width: 100%;
+  }
+
   .workflow-chain {
     display: grid;
-    overflow-x: visible;
   }
 
   .workflow-item {

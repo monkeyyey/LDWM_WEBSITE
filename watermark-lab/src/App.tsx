@@ -46,6 +46,12 @@ type SubmethodSpec = {
   workflows: WorkflowSpec[]
 }
 
+type ProcessSpec = {
+  workflow: WorkflowId
+  label: string
+  steps: string[]
+}
+
 type Method = {
   id: MethodId
   name: string
@@ -54,7 +60,7 @@ type Method = {
   mechanism: string
   bestFor: string
   color: string
-  flow: string[]
+  processes: ProcessSpec[]
   submethods: SubmethodSpec[]
 }
 
@@ -194,7 +200,11 @@ const methods: Method[] = [
     mechanism: 'Embeds a keyed pattern into the Fourier space of Gaussian latent noise before Stable Diffusion generation.',
     bestFor: 'Pattern verification and identification from a generated image after DDIM inversion.',
     color: '#136f63',
-    flow: ['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image', 'DDIM inversion', 'Verification / identification'],
+    processes: [
+      { workflow: 'generate', label: 'Generation', steps: ['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image'] },
+      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + saved pattern', 'DDIM inversion', 'Expected-pattern distance', 'Verification result'] },
+      { workflow: 'identify', label: 'Identification', steps: ['Watermarked image + 2048-pattern bank', 'DDIM inversion', 'Candidate distance search', 'Closest pattern index'] },
+    ],
     submethods: [
       { id: 'hsqr', name: 'HSQR', description: 'Hermitian-symmetric QR-like Fourier pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSQR', messageMode: 'variant', repoDefaults: ['wm_type: HSQR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
       { id: 'hstr', name: 'HSTR', description: 'Hermitian-symmetric tree-ring pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSTR', messageMode: 'variant', repoDefaults: ['wm_type: HSTR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
@@ -208,7 +218,10 @@ const methods: Method[] = [
     mechanism: 'Treats generation and inversion as a noisy channel, using redundancy and coding to recover exact bits.',
     bestFor: 'Message verification and bit error measurement after inversion.',
     color: '#7a4f00',
-    flow: ['Prompt and 256 bits', 'Gaussian or LDPC coding', 'Latent mapping, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image', 'DDIM inversion', 'Bit extraction and BER'],
+    processes: [
+      { workflow: 'generate', label: 'Generation', steps: ['Prompt + 256-bit message', 'Gaussian or LDPC coding', 'Latent mapping, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image'] },
+      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + expected message', 'DDIM inversion', 'Bit extraction + decoding', 'Recovered bits + BER'] },
+    ],
     submethods: [
       { id: 'gaussian', name: 'Gaussian coding', description: 'Gaussian diffusion of the message with spatial redundancy and majority-vote decoding.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: Gaussian', 'message: 256 bits', 'redundancy: 64'], workflows: gaussianWorkflows },
       { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting code with pseudo-random sign flips, redundancy, and a majority-vote fallback.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: LDPC', 'message: 256 bits', 'code rate: 0.25'], workflows: gaussianWorkflows },
@@ -222,7 +235,10 @@ const methods: Method[] = [
     mechanism: 'Uses a modified Stable Diffusion VAE decoder to carry a pretrained binary watermark during generation.',
     bestFor: '48-bit message verification with the pretrained decoder.',
     color: '#315f9f',
-    flow: ['Prompt and 48 bits', 'Stable Diffusion sampling', 'LaWa modified VAE decoder', 'Watermarked image', 'Pretrained message decoder', 'Recovered bits and BER'],
+    processes: [
+      { workflow: 'generate', label: 'Generation', steps: ['Prompt + 48-bit message', 'Stable Diffusion sampling', 'LaWa modified VAE decoder', 'Watermarked image'] },
+      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image', 'Pretrained message decoder', 'Recovered 48 bits + BER'] },
+    ],
     submethods: [
       { id: 'lawa-48', name: 'LaWa 48-bit', description: 'The repository exposes one pretrained LaWa configuration with a 48-bit message and SD v1.4.', payload: '48-bit message', defaultMessage: '110111001110110001000000011101000110011100110101', repoDefaults: ['config: SD14_LaWa_inference.yaml', 'message_len: 48', 'checkpoint: sd-v1-4.ckpt'], workflows: lawaWorkflows },
     ],
@@ -235,7 +251,10 @@ const methods: Method[] = [
     mechanism: 'Diffuses a repository-generated bit watermark, randomizes it with XOR or ChaCha20, and samples each latent value from the matching half of a Gaussian distribution.',
     bestFor: 'Training-free keyed watermark verification with FPR-derived detection and traceability thresholds.',
     color: '#9a3f58',
-    flow: ['Prompt', 'Random watermark and key', 'Diffuse and encrypt bits', 'Truncated-Gaussian latent sampling', 'Diffusion generation', 'Watermarked image', 'Empty-prompt DDIM inversion', 'Decrypt, vote, and verify'],
+    processes: [
+      { workflow: 'generate', label: 'Generation', steps: ['Prompt + generated watermark', 'Diffuse + randomize bits', 'Truncated-Gaussian latent sampling', 'Diffusion generation', 'Watermarked image'] },
+      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + saved key', 'Empty-prompt DDIM inversion', 'Decrypt + redundancy vote', 'Bit accuracy + BER', 'Detection + traceability thresholds'] },
+    ],
     submethods: [
       { id: 'chacha', name: 'ChaCha20', description: 'The strict distribution-preserving variant encrypts diffused watermark bits with a random ChaCha20 key and nonce.', payload: 'Repository-generated bit watermark', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'capacity: 256 bits', 'FPR: 1e-6', 'users: 1,000,000'], workflows: gaussianShadingWorkflows },
       { id: 'simple', name: 'Simple XOR', description: 'The faster baseline randomizes diffused bits with a random binary key; the upstream README says it is not strictly performance-lossless.', payload: 'Repository-generated bit watermark', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'capacity: 256 bits', 'randomization: XOR'], workflows: gaussianShadingWorkflows },
@@ -249,7 +268,11 @@ const methods: Method[] = [
     mechanism: 'Encodes a keyed pseudorandom codeword, maps its signs to pseudogaussian initial noise, and applies Detect or Decode after exact diffusion inversion.',
     bestFor: 'Undetectable keyed binary detection and decode-validity testing at a target false-positive rate.',
     color: '#34766f',
-    flow: ['Prompt', 'PRC key generation', 'Random PRC codeword', 'Pseudogaussian latent, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image', 'Exact inversion', 'Detect or Decode'],
+    processes: [
+      { workflow: 'generate', label: 'Generation', steps: ['Prompt + PRC key generation', 'Random keyed codeword', 'Pseudogaussian latent, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image'] },
+      { workflow: 'detect', label: 'Detect', steps: ['Watermarked image + decoding key', 'Exact inversion', 'Posterior vector', 'Statistical Detect decision'] },
+      { workflow: 'decode', label: 'Decode', steps: ['Watermarked image + decoding key', 'Exact inversion', 'Posterior vector', 'Belief propagation + validity'] },
+    ],
     submethods: [
       { id: 'prc', name: 'PRC', description: 'The released implementation uses one PRC path with a 16,384-symbol codeword. Detect and Decode are separate operations; the original decode.py runs both and reports an optional OR combination.', payload: 'Keyed binary presence decision', defaultMessage: 'Generated keyed PRC codeword', messageMode: 'generated', repoDefaults: ['codeword: 16,384 symbols', 'FPR: 1e-5', 'parity sparsity t: 3', 'posterior variance: 1.5'], workflows: prcWorkflows },
     ],
@@ -519,7 +542,6 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div><p className="eyebrow">Repository workflow dashboard</p><h2>Explore latent-domain watermarking methods and their actual evaluation paths</h2></div>
-          <div className="run-controls"><button className="icon-button" onClick={resetRun} type="button" aria-label="Reset run" title="Reset run"><RotateCcw size={18} /></button><button className="primary-button" disabled={result.status === 'running'} onClick={() => runBackendJob()} type="button"><Play size={18} />Run</button></div>
         </header>
 
         <section className="method-grid" aria-label="Watermark repositories">
@@ -563,12 +585,26 @@ function App() {
               <label className="field"><span>Diffusion steps</span><input min="1" max="200" step="1" type="number" value={repositoryOptions.inference_steps} onChange={(event) => setRepositoryOptions((current) => ({ ...current, inference_steps: Number(event.target.value) }))} /></label>
             </div> : null}
 
-            <section className="method-explainer" aria-label={`${selectedMethod.name} explanation`}><div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div><div className="latent-facts"><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div><div className="workflow-contract" aria-label={`${selectedWorkflow.label} inputs and outputs`}><div><span>Needs</span><ul>{selectedWorkflow.inputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Returns</span><ul>{selectedWorkflow.outputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Repository context</span><p>{selectedWorkflow.source}</p></div></div><div className="workflow-chain" aria-label={`${selectedMethod.name} repository flow`}>{selectedMethod.flow.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></section>
-
-            <div className="repo-defaults" aria-label="Repository defaults">{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>
+            <div className="form-actions">
+              <button className="reset-button" onClick={resetRun} type="button"><RotateCcw size={17} />Reset</button>
+              <button className="primary-button" disabled={result.status === 'running'} onClick={() => runBackendJob()} type="button"><Play size={17} />{result.status === 'running' ? 'Running...' : `Run ${selectedWorkflow.label}`}</button>
+            </div>
           </div>
 
           <div className="preview-panel"><div className="section-heading"><Aperture size={18} /><div><h3>{isGeneration ? 'Generated Image' : 'Analysis Image'}</h3><p className="heading-description">{isGeneration ? 'Only the watermarked output is shown.' : 'The image supplied to this repository workflow.'}</p></div></div><div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>{uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded watermarked preview" /> : <div className="latent-grid" />}<span className="stage-badge">{isGeneration ? 'watermarked image' : 'analysis input'}</span></div><div className="method-detail"><strong>{selectedWorkflow.label}: {selectedSubmethod.name}</strong><p>{selectedWorkflow.description}</p></div></div>
+
+          <section className="implementation-panel" aria-label={`${selectedMethod.name} explanation`} style={{ '--method-color': selectedMethod.color } as CSSProperties}>
+            <div className="implementation-summary">
+              <div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div>
+              <div><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>
+            </div>
+            <div className="workflow-contract" aria-label={`${selectedWorkflow.label} inputs and outputs`}><div><span>Needs</span><ul>{selectedWorkflow.inputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Returns</span><ul>{selectedWorkflow.outputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Repository context</span><p>{selectedWorkflow.source}</p></div></div>
+            <div className="repo-defaults" aria-label="Repository defaults"><strong>Repository defaults</strong>{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>
+            <div className="process-map">
+              <div className="process-map-heading"><span>Repository processes</span><p>Each row is a separate executable path. The selected action is highlighted.</p></div>
+              <div className="process-rows">{selectedMethod.processes.map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><span>Process</span><strong>{process.label}</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
+            </div>
+          </section>
 
           <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
             <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' ? <><div className="metric"><span>Detection</span><strong>{result.raw?.detected === undefined ? '--' : result.raw.detected ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Traceability</span><strong>{result.raw?.traceable === undefined ? '--' : result.raw.traceable ? 'Passed' : 'Not passed'}</strong></div><div className="metric"><span>Bit accuracy</span><strong>{typeof result.raw?.bit_accuracy === 'number' ? `${(result.raw.bit_accuracy * 100).toFixed(2)}%` : '--'}</strong></div><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div></> : isPrcAnalysis ? isPrcDetect ? <><div className="metric"><span>Detect result</span><strong>{result.raw?.detection_result === undefined ? '--' : result.raw.detection_result ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : <><div className="metric"><span>Decode validity</span><strong>{result.raw?.decoding_result === undefined ? '--' : result.raw.decoding_result ? 'Valid' : 'Invalid'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
