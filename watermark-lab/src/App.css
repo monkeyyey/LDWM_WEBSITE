@@ -355,6 +355,17 @@ textarea {
   resize: vertical;
 }
 
+.message-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.55;
+  min-height: 144px;
+  overflow-wrap: anywhere;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
 input:focus,
 select:focus,
 textarea:focus {

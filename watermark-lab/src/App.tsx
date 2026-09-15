@@ -566,7 +566,7 @@ function App() {
             </> : null}
 
             <div className="field-row">
-              <label className="field"><span>{messageFieldLabel}</span>{selectedSubmethod.messageMode === 'variant' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={messageLockedToJob} readOnly={messageLockedToJob} />}</label>
+              <label className={`field ${selectedMethod.id === 'gaussian-shannon' && selectedSubmethod.messageMode !== 'variant' ? 'message-field' : ''}`}><span>{messageFieldLabel}</span>{selectedSubmethod.messageMode === 'variant' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : selectedMethod.id === 'gaussian-shannon' ? <textarea className="message-textarea" rows={6} value={message} onChange={(event) => setMessage(event.target.value.replace(/\s/g, ''))} disabled={messageLockedToJob} readOnly={messageLockedToJob} spellCheck={false} /> : <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={messageLockedToJob} readOnly={messageLockedToJob} />}</label>
               <label className="field small-field"><span>Seed</span><input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration} /></label>
             </div>
 
