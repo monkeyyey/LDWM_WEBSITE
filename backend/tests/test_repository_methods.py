@@ -15,7 +15,7 @@ from adapters.repository_method import RepositoryMethodAdapter, validated_option
 from adapters.repo_process import _result_marker, save_image_input
 from registry import MethodRegistry
 from schemas import WatermarkRequest
-from run_job import Context, SetupRequired, preflight
+from run_job import Context, SetupRequired, preflight, serializable_cpu
 
 CATALOG = json.loads((ROOT / "backend/config/repository_methods.json").read_text())
 
@@ -33,6 +33,32 @@ class AdapterContracts(unittest.TestCase):
         args = dict(method="tree-ring", workflow="generate", message="", submethod_id="ring", prompt="test", seed=42)
         args.update(kwargs)
         return WatermarkRequest(**args)
+
+    def test_private_state_serialization_widens_complex_half(self):
+        from types import SimpleNamespace
+
+        complex32 = object()
+        complex64 = object()
+
+        class FakeTensor:
+            def __init__(self, dtype, device="cuda"):
+                self.dtype = dtype
+                self.device = device
+
+            def to(self, target):
+                if target == complex64 or target == complex32:
+                    return FakeTensor(target, self.device)
+                return FakeTensor(self.dtype, target)
+
+        fake_torch = SimpleNamespace(Tensor=FakeTensor, complex32=complex32, complex64=complex64)
+        source = {"pattern": [FakeTensor(complex32)], "mask": FakeTensor("float16")}
+        with patch.dict(sys.modules, {"torch": fake_torch}):
+            saved = serializable_cpu(source)
+
+        self.assertIs(saved["pattern"][0].dtype, complex64)
+        self.assertEqual(saved["pattern"][0].device, "cpu")
+        self.assertEqual(saved["mask"].dtype, "float16")
+        self.assertEqual(saved["mask"].device, "cpu")
 
     def test_model_revision_defaults_to_fp16_and_can_be_overridden(self):
         import noise_methods

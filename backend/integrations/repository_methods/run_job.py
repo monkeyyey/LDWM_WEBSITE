@@ -34,6 +34,22 @@ def move(value, device):
     return value
 
 
+def serializable_cpu(value):
+    """Move private state to CPU and widen complex-half tensors for PyTorch 1.13 serialization."""
+    import torch
+    if isinstance(value, torch.Tensor):
+        if value.dtype == torch.complex32:
+            value = value.to(torch.complex64)
+        return value.to("cpu")
+    if isinstance(value, dict):
+        return {key: serializable_cpu(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [serializable_cpu(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(serializable_cpu(item) for item in value)
+    return value
+
+
 def load_trusted(path, device="cpu"):
     import torch
     # State is server-created, never accepted as an uploaded pickle/checkpoint.
@@ -61,7 +77,7 @@ class Context:
         import torch
         self.output.mkdir(parents=True, exist_ok=True)
         private = self.output / "private.pt"
-        torch.save(move(state, "cpu"), private)
+        torch.save(serializable_cpu(state), private)
         private.chmod(0o600)
         image.save(self.output / "watermarked.png")
         fields = {k: self.request[k] for k in ("method", "prompt", "seed", "model_id", "options", "expected_revision")}
