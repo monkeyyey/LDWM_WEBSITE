@@ -2,8 +2,10 @@ import {
   Activity,
   Aperture,
   ArrowRight,
+  Check,
   CheckCircle2,
   Cloud,
+  Copy,
   Download,
   Gauge,
   ImageUp,
@@ -85,6 +87,7 @@ type Result = {
   raw?: BackendResult['raw']
   imageUrl?: string | null
   isError?: boolean
+  errorDetails?: string
   jobId?: string | null
   jobNumber?: number | null
 }
@@ -144,7 +147,9 @@ type BackendResult = {
     codeword_length?: number
     inversion_order?: number
     inversion_prompt?: string
+    error?: string
   }
+  logs?: string[]
 }
 
 type RepositoryOptions = {
@@ -363,6 +368,7 @@ function App() {
   const [sourceJobId, setSourceJobId] = useState<string | null>(null)
   const [jobs, setJobs] = useState<JobSummary[]>([])
   const [selectedJobId, setSelectedJobId] = useState('')
+  const [copiedErrorDetails, setCopiedErrorDetails] = useState(false)
   const [result, setResult] = useState<Result>({ status: 'idle', workflow: 'generate', title: 'Ready', score: 0, bits: '--', runtime: '--', notes: 'Choose a method, submethod, and workflow, then run the repository-backed action.', imageUrl: null })
   const runTokenRef = useRef(0)
   const requestInFlightRef = useRef(false)
@@ -507,7 +513,8 @@ function App() {
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}))
         if (runToken !== runTokenRef.current) return
-        setResult({ status: 'done', workflow, title: 'Backend request failed', score: 0, bits: '--', runtime: '--', notes: errorPayload.error ?? `Backend returned ${response.status}`, imageUrl: null, isError: true })
+        const errorText = errorPayload.error ?? `Backend returned ${response.status}`
+        setResult({ status: 'done', workflow, title: 'Backend request failed', score: 0, bits: '--', runtime: '--', notes: errorText, errorDetails: errorText, imageUrl: null, isError: true })
         return
       }
 
@@ -525,6 +532,14 @@ function App() {
         bitErrorRate: typeof backendResult.raw?.bit_error_rate === 'number' ? `${(backendResult.raw.bit_error_rate * 100).toFixed(2)}%` : undefined,
         runtime: backendResult.runtime,
         notes: resultSummary(workflow, backendResult, backendImageUrl),
+        errorDetails: backendResult.status === 'failed' || backendResult.status === 'setup_required' || backendResult.status === 'unsupported'
+          ? [
+              `${selectedMethod.name} · ${workflowSpec.label} · ${backendResult.status}`,
+              backendResult.recovered_payload,
+              backendResult.raw?.summary,
+              ...(backendResult.logs ?? []),
+            ].filter((line, index, lines): line is string => Boolean(line) && lines.indexOf(line) === index).join('\n\n')
+          : undefined,
         raw: backendResult.raw,
         imageUrl: backendImageUrl,
         isError: backendResult.status === 'failed' || backendResult.status === 'setup_required' || backendResult.status === 'unsupported',
@@ -539,7 +554,8 @@ function App() {
       }
     } catch (error) {
       if (runToken !== runTokenRef.current) return
-      setResult({ status: 'done', workflow, title: 'Backend not reachable', score: 0, bits: '--', runtime: '--', notes: `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase}.`, imageUrl: null, isError: true })
+      const errorText = `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase}.`
+      setResult({ status: 'done', workflow, title: 'Backend not reachable', score: 0, bits: '--', runtime: '--', notes: errorText, errorDetails: errorText, imageUrl: null, isError: true })
     } finally {
       requestInFlightRef.current = false
     }
@@ -711,6 +727,18 @@ function App() {
             {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' && result.raw ? <div className="repository-result-note"><div><span>Detection threshold</span><strong>{typeof result.raw.tau_detection === 'number' ? result.raw.tau_detection.toFixed(4) : '--'} accuracy at FPR {result.raw.fpr ?? '--'}</strong></div><div><span>Traceability threshold</span><strong>{typeof result.raw.tau_traceability === 'number' ? result.raw.tau_traceability.toFixed(4) : '--'} across {result.raw.user_number ?? '--'} users</strong></div><div><span>Recovered watermark</span><strong>{result.raw.mark_length ?? '--'} bits · {result.raw.channel_copy ?? '--'} channel copies · {result.raw.hw_copy ?? '--'} x {result.raw.hw_copy ?? '--'} spatial copies</strong></div></div> : null}
             {isPrcAnalysis && result.raw ? <div className="repository-result-note"><div><span>Repository operation</span><strong>{isPrcDetect ? 'Detect' : 'Decode'}</strong></div><div><span>Repository decoder</span><strong>{result.raw.decoder ?? (isPrcDetect ? 'Detect' : 'Decode')}</strong></div><div><span>Decision rule</span><strong>{result.raw.decision_rule ?? (isPrcDetect ? 'Detect' : 'Decode validity')}</strong></div><div><span>PRC parameters</span><strong>n = {result.raw.codeword_length ?? '--'} · t = {result.raw.prc_t ?? '--'} · variance = {result.raw.posterior_variance ?? '--'}</strong></div><div><span>Posterior and key</span><strong>{result.raw.posterior_length ?? '--'} values · noise rate {result.raw.noise_rate ?? '--'} · {result.raw.test_bit_count ?? '--'} test bits</strong></div><div><span>Decode limit</span><strong>{result.raw.max_bp_iter ?? '--'} BP iterations{isPrcDetect ? ' (not used by Detect)' : ''}</strong></div><div><span>Message output</span><strong>{result.raw.message_available ? 'Recovered message' : 'No user message; validity only'}</strong></div><div><span>Inversion</span><strong>Order {result.raw.inversion_order ?? '--'} · empty prompt</strong></div></div> : null}
             <div className="api-note"><KeyRound size={18} /><p>{result.notes}</p></div>
+            {result.isError && result.errorDetails ? <section className="error-details" aria-label="Full error details">
+              <div className="error-details-heading"><strong>Full error details</strong><button className="copy-error-button" onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(result.errorDetails ?? '')
+                  setCopiedErrorDetails(true)
+                  window.setTimeout(() => setCopiedErrorDetails(false), 1800)
+                } catch {
+                  setCopiedErrorDetails(false)
+                }
+              }} type="button" title="Copy full error details" aria-label="Copy full error details">{copiedErrorDetails ? <Check size={16} /> : <Copy size={16} />}{copiedErrorDetails ? 'Copied' : 'Copy'}</button></div>
+              <pre>{result.errorDetails}</pre>
+            </section> : null}
             {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions">{repositorySpec ? selectedSubmethod.workflows.filter((item) => item.available && item.id !== 'generate').map((item) => <button className="secondary-button" key={item.id} disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage(item.id)} type="button"><Search size={18} />{item.label}</button>) : selectedMethod.id === 'prc-watermark' ? <><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('detect')} type="button"><Search size={18} />Run Detect</button><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('decode')} type="button"><ShieldCheck size={18} />Run Decode</button></> : <button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>}{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
           </div>}
         </section>
