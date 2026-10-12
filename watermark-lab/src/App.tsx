@@ -8,6 +8,8 @@ import {
   Gauge,
   ImageUp,
   KeyRound,
+  Layers,
+  LockKeyhole,
   Play,
   RotateCcw,
   Search,
@@ -16,11 +18,11 @@ import {
   Sparkles,
   Waves,
 } from 'lucide-react'
-import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { categories, plannedMethods, type CategoryId, type PlannedMethodId, type WorkflowId } from './methodCatalog'
 
-type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa' | 'gaussian-shading' | 'prc-watermark'
-type WorkflowId = 'generate' | 'verify' | 'detect' | 'decode' | 'identify'
+type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa' | 'gaussian-shading' | 'prc-watermark' | PlannedMethodId
 type BackendWorkflow = 'detect' | 'generate'
 
 type WorkflowSpec = {
@@ -56,6 +58,8 @@ type Method = {
   id: MethodId
   name: string
   shortName: string
+  categoryId: CategoryId
+  status: 'integrated' | 'planned'
   category: string
   mechanism: string
   bestFor: string
@@ -196,6 +200,8 @@ const methods: Method[] = [
     id: 'sfwmark',
     name: 'SFWMark',
     shortName: 'SFW',
+    categoryId: 'latent-noise',
+    status: 'integrated',
     category: 'Fourier latent watermark',
     mechanism: 'Embeds a keyed pattern into the Fourier space of Gaussian latent noise before Stable Diffusion generation.',
     bestFor: 'Pattern verification and identification from a generated image after DDIM inversion.',
@@ -214,6 +220,8 @@ const methods: Method[] = [
     id: 'gaussian-shannon',
     name: 'Gaussian Shannon',
     shortName: 'GS',
+    categoryId: 'latent-noise',
+    status: 'integrated',
     category: 'Communication-code watermark',
     mechanism: 'Treats generation and inversion as a noisy channel, using redundancy and coding to recover exact bits.',
     bestFor: 'Message verification and bit error measurement after inversion.',
@@ -231,6 +239,8 @@ const methods: Method[] = [
     id: 'lawa',
     name: 'LaWa',
     shortName: 'LW',
+    categoryId: 'vae-decoder',
+    status: 'integrated',
     category: 'VAE decoder watermark',
     mechanism: 'Uses a modified Stable Diffusion VAE decoder to carry a pretrained binary watermark during generation.',
     bestFor: '48-bit message verification with the pretrained decoder.',
@@ -247,6 +257,8 @@ const methods: Method[] = [
     id: 'gaussian-shading',
     name: 'Gaussian Shading',
     shortName: 'GSh',
+    categoryId: 'latent-noise',
+    status: 'integrated',
     category: 'Distribution-preserving latent watermark',
     mechanism: 'Diffuses a repository-generated bit watermark, randomizes it with XOR or ChaCha20, and samples each latent value from the matching half of a Gaussian distribution.',
     bestFor: 'Training-free keyed watermark verification with FPR-derived detection and traceability thresholds.',
@@ -264,6 +276,8 @@ const methods: Method[] = [
     id: 'prc-watermark',
     name: 'PRC-Watermark',
     shortName: 'PRC',
+    categoryId: 'latent-noise',
+    status: 'integrated',
     category: 'Pseudorandom-code latent watermark',
     mechanism: 'Encodes a keyed pseudorandom codeword, maps its signs to pseudogaussian initial noise, and applies Detect or Decode after exact diffusion inversion.',
     bestFor: 'Undetectable keyed binary detection and decode-validity testing at a target false-positive rate.',
@@ -277,7 +291,33 @@ const methods: Method[] = [
       { id: 'prc', name: 'PRC', description: 'The released implementation uses one PRC path with a 16,384-symbol codeword. Detect and Decode are separate operations; the original decode.py runs both and reports an optional OR combination.', payload: 'Keyed binary presence decision', defaultMessage: 'Generated keyed PRC codeword', messageMode: 'generated', repoDefaults: ['codeword: 16,384 symbols', 'FPR: 1e-5', 'parity sparsity t: 3', 'posterior variance: 1.5'], workflows: prcWorkflows },
     ],
   },
+  ...plannedMethods.map((method): Method => ({
+    ...method,
+    status: 'planned',
+    bestFor: method.payload,
+    color: categories.find((category) => category.id === method.categoryId)!.color,
+    submethods: [{
+      id: method.id,
+      name: method.name,
+      description: method.mechanism,
+      payload: method.payload,
+      defaultMessage: '',
+      repoDefaults: [],
+      workflows: method.processes.map((process) => ({
+        id: process.workflow,
+        label: process.label,
+        description: process.steps.join(' -> '),
+        backendWorkflow: null,
+        available: false,
+        inputs: [process.steps[0]],
+        outputs: [process.steps[process.steps.length - 1]],
+        source: 'Awaiting repository integration; inputs, parameters, and artifacts will be finalized during implementation.',
+      })),
+    }],
+  })),
 ]
+
+const integratedMethodCount = methods.filter((method) => method.status === 'integrated').length
 
 function defaultRepositoryOptions(methodId: MethodId): RepositoryOptions {
   return {
@@ -298,6 +338,7 @@ const apiBase = import.meta.env.VITE_API_BASE ?? (isLocalFrontend ? `${currentLo
 const fileBase = import.meta.env.VITE_FILE_BASE ?? (isLocalFrontend ? apiBase : (currentLocation?.origin ?? ''))
 
 function App() {
+  const [categoryId, setCategoryId] = useState<CategoryId>('latent-noise')
   const [workflowId, setWorkflowId] = useState<WorkflowId>('generate')
   const [methodId, setMethodId] = useState<MethodId>('sfwmark')
   const [submethodId, setSubmethodId] = useState(methods[0].submethods[0].id)
@@ -315,6 +356,9 @@ function App() {
   const requestInFlightRef = useRef(false)
 
   const selectedMethod = useMemo(() => methods.find((method) => method.id === methodId) ?? methods[0], [methodId])
+  const selectedCategory = categories.find((category) => category.id === categoryId) ?? categories[0]
+  const categoryMethods = methods.filter((method) => method.categoryId === categoryId)
+  const isPlanned = selectedMethod.status === 'planned'
   const selectedSubmethod = useMemo(() => selectedMethod.submethods.find((submethod) => submethod.id === submethodId) ?? selectedMethod.submethods[0], [selectedMethod, submethodId])
   const selectedWorkflow = useMemo(() => selectedSubmethod.workflows.find((workflow) => workflow.id === workflowId) ?? selectedSubmethod.workflows[0], [selectedSubmethod, workflowId])
   const isGeneration = selectedWorkflow.id === 'generate'
@@ -335,18 +379,6 @@ function App() {
           ? 'Watermark bits'
           : 'PRC codeword (repository-generated)'
 
-  const loadJobs = useCallback(async () => {
-    try {
-      const query = new URLSearchParams({ method: selectedMethod.id, submethod: selectedSubmethod.id })
-      const response = await fetch(`${apiBase}/jobs?${query.toString()}`)
-      if (!response.ok) return
-      const payload = await response.json()
-      setJobs(payload.jobs ?? [])
-    } catch {
-      setJobs([])
-    }
-  }, [selectedMethod.id, selectedSubmethod.id])
-
   useEffect(() => {
     const nextSubmethod = selectedMethod.submethods[0]
     setSubmethodId(nextSubmethod.id)
@@ -355,8 +387,22 @@ function App() {
   }, [methodId, selectedMethod])
 
   useEffect(() => {
-    if (!isGeneration) void loadJobs()
-  }, [isGeneration, loadJobs])
+    if (isGeneration || isPlanned) return
+    const controller = new AbortController()
+    async function loadJobs() {
+      try {
+        const query = new URLSearchParams({ method: selectedMethod.id, submethod: selectedSubmethod.id })
+        const response = await fetch(`${apiBase}/jobs?${query.toString()}`, { signal: controller.signal })
+        if (!response.ok) return
+        const payload = await response.json()
+        if (!controller.signal.aborted) setJobs(payload.jobs ?? [])
+      } catch {
+        if (!controller.signal.aborted) setJobs([])
+      }
+    }
+    void loadJobs()
+    return () => controller.abort()
+  }, [isGeneration, isPlanned, selectedMethod.id, selectedSubmethod.id])
 
   useEffect(() => {
     if (!selectedSubmethod.workflows.some((workflow) => workflow.id === workflowId)) setWorkflowId(selectedSubmethod.workflows[0].id)
@@ -374,6 +420,7 @@ function App() {
 
   function selectMethod(id: MethodId) {
     const nextMethod = methods.find((method) => method.id === id) ?? methods[0]
+    setCategoryId(nextMethod.categoryId)
     setMethodId(id)
     setSubmethodId(nextMethod.submethods[0].id)
     setMessage(nextMethod.submethods[0].defaultMessage)
@@ -389,11 +436,18 @@ function App() {
     setUploadName('No image selected')
     setSourceJobId(null)
     setSelectedJobId('')
+    setJobs([])
+  }
+
+  function selectCategory(id: CategoryId) {
+    if (id === categoryId) return
+    const firstMethod = methods.find((method) => method.categoryId === id)
+    if (firstMethod) selectMethod(firstMethod.id)
   }
 
   function selectWorkflow(id: WorkflowId) {
     const next = selectedSubmethod.workflows.find((workflow) => workflow.id === id)
-    if (!next?.available) return
+    if (!next || (!next.available && !isPlanned)) return
     setWorkflowId(id)
     resetResult(id)
   }
@@ -409,11 +463,12 @@ function App() {
   }
 
   async function runBackendJob(workflow: WorkflowId = selectedWorkflow.id) {
+    const workflowSpec = selectedSubmethod.workflows.find((item) => item.id === workflow) ?? selectedWorkflow
+    if (isPlanned || !workflowSpec.available || !workflowSpec.backendWorkflow) return
     if (requestInFlightRef.current) return
     requestInFlightRef.current = true
     const runToken = ++runTokenRef.current
     const requestMethodId = methodId
-    const workflowSpec = selectedSubmethod.workflows.find((item) => item.id === workflow) ?? selectedWorkflow
     setResult((current) => ({ ...current, workflow, status: 'running', title: `Running ${workflowSpec.label.toLowerCase()}`, notes: `Calling backend at ${apiBase}.` }))
 
     try {
@@ -435,8 +490,10 @@ function App() {
         }),
       })
 
+      if (runToken !== runTokenRef.current) return
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}))
+        if (runToken !== runTokenRef.current) return
         setResult({ status: 'done', workflow, title: 'Backend request failed', score: 0, bits: '--', runtime: '--', notes: errorPayload.error ?? `Backend returned ${response.status}`, imageUrl: null, isError: true })
         return
       }
@@ -468,6 +525,7 @@ function App() {
         setSelectedJobId(backendJobId ?? '')
       }
     } catch (error) {
+      if (runToken !== runTokenRef.current) return
       setResult({ status: 'done', workflow, title: 'Backend not reachable', score: 0, bits: '--', runtime: '--', notes: `${error instanceof Error ? error.message : 'Network error'}. Make sure backend is running on ${apiBase}.`, imageUrl: null, isError: true })
     } finally {
       requestInFlightRef.current = false
@@ -535,25 +593,44 @@ function App() {
           <div className="brand-mark"><Waves size={21} /></div>
           <div><p className="eyebrow">Latent Domain</p><h1>Watermark Lab</h1><span className="owner-name">Chern Ze Hou</span></div>
         </div>
-        <div className="sidebar-context"><strong>{selectedMethod.name}</strong><span>{selectedSubmethod.name} · {selectedWorkflow.label}</span></div>
-        <div className="deployment"><Cloud size={18} /><div><strong>Repository map</strong><span>5 methods connected</span></div></div>
+        <div className="sidebar-context"><strong>{selectedMethod.name}</strong><span>{isPlanned ? 'Planned integration' : selectedSubmethod.name} · {selectedWorkflow.label}</span></div>
+        <div className="deployment"><Cloud size={18} /><div><strong>Method catalogue</strong><span>{integratedMethodCount} integrated · {methods.length - integratedMethodCount} planned</span></div></div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
-          <div><p className="eyebrow">Repository workflow dashboard</p><h2>Explore latent-domain watermarking methods and their actual evaluation paths</h2></div>
+          <div><p className="eyebrow">Watermark methods</p><h2>Watermark catalogue</h2></div>
+          <span className="catalogue-total">{categories.length} categories · {methods.length} methods</span>
         </header>
 
-        <section className="method-grid" aria-label="Watermark repositories">
-          {methods.map((method) => <button className={`method-card ${method.id === selectedMethod.id ? 'selected' : ''}`} key={method.id} onClick={() => selectMethod(method.id)} style={{ '--method-color': method.color } as CSSProperties} type="button"><span className="method-token">{method.shortName}</span><span><strong>{method.name}</strong><small>{method.category}</small></span></button>)}
+        <nav className="category-grid" aria-label="Watermark categories">
+          {categories.map((category, index) => {
+            const count = methods.filter((method) => method.categoryId === category.id).length
+            const CategoryIcon = [Waves, Aperture, Layers, SlidersHorizontal, Activity][index]
+            return <button aria-pressed={category.id === categoryId} className={`category-button ${category.id === categoryId ? 'selected' : ''}`} key={category.id} onClick={() => selectCategory(category.id)} style={{ '--category-color': category.color } as CSSProperties} type="button">
+              <CategoryIcon aria-hidden="true" size={20} />
+              <span className="category-copy"><strong>{category.name}</strong><small>{category.detail}</small></span>
+              <span className="category-count" aria-label={`${count} methods`}>{count}</span>
+            </button>
+          })}
+        </nav>
+
+        <div className="category-heading"><h3>{selectedCategory.name}</h3><span>{categoryMethods.length} {categoryMethods.length === 1 ? 'method' : 'methods'}</span></div>
+        <section className="method-grid" aria-label={`${selectedCategory.name} methods`}>
+          {categoryMethods.map((method) => <button aria-pressed={method.id === selectedMethod.id} className={`method-card ${method.id === selectedMethod.id ? 'selected' : ''}`} key={method.id} onClick={() => selectMethod(method.id)} style={{ '--method-color': method.color } as CSSProperties} type="button"><span className="method-token">{method.shortName}</span><span className="method-copy"><strong>{method.name}</strong><small>{method.category}</small><span className={`method-status ${method.status}`}>{method.status === 'integrated' ? <CheckCircle2 aria-hidden="true" size={12} /> : <LockKeyhole aria-hidden="true" size={12} />}{method.status === 'integrated' ? 'Integrated' : 'Planned'}</span></span></button>)}
         </section>
 
         <section className="method-navigation" aria-label={`${selectedMethod.name} submethods and workflows`}>
-          <div className="navigation-group"><div className="navigation-label"><span>Submethod</span><strong>{selectedMethod.name}</strong></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>
-          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-disabled={!workflow.available} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : workflow.unavailableReason ?? `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div>{selectedSubmethod.workflows.filter((workflow) => !workflow.available).map((workflow) => <p className="workflow-unavailable" key={workflow.id}><strong>{workflow.label} unavailable:</strong> {workflow.unavailableReason}</p>)}</div></div>
+          {!isPlanned && <div className="navigation-group"><div className="navigation-label"><span>Submethod</span><strong>{selectedMethod.name}</strong></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button aria-pressed={submethod.id === selectedSubmethod.id} className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>}
+          <div className="navigation-group"><div className="navigation-label"><span>{isPlanned ? 'Planned workflow' : 'Repository action'}</span><strong>{selectedWorkflow.label}</strong></div><div><div className="workflow-tabs">{selectedSubmethod.workflows.map((workflow) => <button aria-pressed={workflow.id === selectedWorkflow.id} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available || isPlanned ? '' : 'disabled'}`} disabled={!workflow.available && !isPlanned} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={isPlanned ? `${workflow.label} · planned` : workflow.available ? workflow.label : workflow.unavailableReason ?? `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div>{!isPlanned && selectedSubmethod.workflows.filter((workflow) => !workflow.available).map((workflow) => <p className="workflow-unavailable" key={workflow.id}><strong>{workflow.label} unavailable:</strong> {workflow.unavailableReason}</p>)}</div></div>
         </section>
 
-        <section className="main-grid">
+        <section className={`main-grid ${isPlanned ? 'planned-grid' : ''}`}>
+          {isPlanned ? <section className="planned-state" aria-label={`${selectedMethod.name} implementation status`}>
+            <div className="planned-symbol"><LockKeyhole aria-hidden="true" size={24} /></div>
+            <div className="planned-copy"><span className="method-status planned">Awaiting implementation</span><h3>{selectedMethod.name}</h3><p>{selectedMethod.mechanism}</p></div>
+            <button className="primary-button" disabled title="This method is awaiting implementation" type="button"><LockKeyhole size={17} />Run unavailable</button>
+          </section> : <>
           <div className="control-panel">
             <div className="section-heading"><SlidersHorizontal size={18} /><div><h3>{selectedWorkflow.label}</h3><p className="heading-description">{selectedWorkflow.description}</p></div></div>
 
@@ -587,33 +664,34 @@ function App() {
 
             <div className="form-actions">
               <button className="reset-button" onClick={resetRun} type="button"><RotateCcw size={17} />Reset</button>
-              <button className="primary-button" disabled={result.status === 'running'} onClick={() => runBackendJob()} type="button"><Play size={17} />{result.status === 'running' ? 'Running...' : `Run ${selectedWorkflow.label}`}</button>
+              <button className="primary-button" disabled={result.status === 'running' || !selectedWorkflow.available} onClick={() => runBackendJob()} type="button"><Play size={17} />{result.status === 'running' ? 'Running...' : `Run ${selectedWorkflow.label}`}</button>
             </div>
           </div>
 
           <div className="preview-panel"><div className="section-heading"><Aperture size={18} /><div><h3>{isGeneration ? 'Generated Image' : 'Analysis Image'}</h3><p className="heading-description">{isGeneration ? 'Only the watermarked output is shown.' : 'The image supplied to this repository workflow.'}</p></div></div><div className="image-stage" style={{ background: uploadedImage ? '#111827' : seedPreview }}>{uploadedImage ? <img src={uploadedImage} alt="Generated or uploaded watermarked preview" /> : <div className="latent-grid" />}<span className="stage-badge">{isGeneration ? 'watermarked image' : 'analysis input'}</span></div><div className="method-detail"><strong>{selectedWorkflow.label}: {selectedSubmethod.name}</strong><p>{selectedWorkflow.description}</p></div></div>
+          </>}
 
           <section className="implementation-panel" aria-label={`${selectedMethod.name} explanation`} style={{ '--method-color': selectedMethod.color } as CSSProperties}>
             <div className="implementation-summary">
-              <div><span>Selected implementation</span><strong>{selectedSubmethod.name}</strong><p>{selectedSubmethod.description}</p></div>
-              <div><span>Payload and backend behavior</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>
+              <div><span>{isPlanned ? 'Planned method' : 'Selected implementation'}</span><strong>{selectedSubmethod.name}</strong><p>{isPlanned ? selectedMethod.category : selectedSubmethod.description}</p></div>
+              <div><span>{isPlanned ? 'Expected watermark' : 'Payload and backend behavior'}</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>
             </div>
             <div className="workflow-contract" aria-label={`${selectedWorkflow.label} inputs and outputs`}><div><span>Needs</span><ul>{selectedWorkflow.inputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Returns</span><ul>{selectedWorkflow.outputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Repository context</span><p>{selectedWorkflow.source}</p></div></div>
-            <div className="repo-defaults" aria-label="Repository defaults"><strong>Repository defaults</strong>{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>
+            {!isPlanned && <div className="repo-defaults" aria-label="Repository defaults"><strong>Repository defaults</strong>{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>}
             <div className="process-map">
-              <div className="process-map-heading"><span>Repository processes</span><p>Each row is a separate executable path. The selected action is highlighted.</p></div>
+              <div className="process-map-heading"><span>{isPlanned ? 'Planned processes' : 'Repository processes'}</span><p>{isPlanned ? 'Repository integration pending' : selectedWorkflow.label}</p></div>
               <div className="process-rows">{selectedMethod.processes.map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><span>Process</span><strong>{process.label}</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
             </div>
           </section>
 
-          <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
+          {!isPlanned && <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
             <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' ? <><div className="metric"><span>Detection</span><strong>{result.raw?.detected === undefined ? '--' : result.raw.detected ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Traceability</span><strong>{result.raw?.traceable === undefined ? '--' : result.raw.traceable ? 'Passed' : 'Not passed'}</strong></div><div className="metric"><span>Bit accuracy</span><strong>{typeof result.raw?.bit_accuracy === 'number' ? `${(result.raw.bit_accuracy * 100).toFixed(2)}%` : '--'}</strong></div><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div></> : isPrcAnalysis ? isPrcDetect ? <><div className="metric"><span>Detect result</span><strong>{result.raw?.detection_result === undefined ? '--' : result.raw.detection_result ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : <><div className="metric"><span>Decode validity</span><strong>{result.raw?.decoding_result === undefined ? '--' : result.raw.decoding_result ? 'Valid' : 'Invalid'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
             {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shannon' && result.raw ? <div className="repository-result-note"><div><span>Repository decoding</span><strong>{result.raw.coding ?? selectedSubmethod.name} · {result.raw.redundancy ?? '--'} redundant copies · {result.raw.num_elements ?? '--'} extracted symbols</strong></div><div><span>Decision rule</span><strong>{result.raw.decoder ?? 'majority vote'}</strong></div><div><span>Verification score</span><strong>{result.score}% bit accuracy</strong></div></div> : null}
             {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' && result.raw ? <div className="repository-result-note"><div><span>Detection threshold</span><strong>{typeof result.raw.tau_detection === 'number' ? result.raw.tau_detection.toFixed(4) : '--'} accuracy at FPR {result.raw.fpr ?? '--'}</strong></div><div><span>Traceability threshold</span><strong>{typeof result.raw.tau_traceability === 'number' ? result.raw.tau_traceability.toFixed(4) : '--'} across {result.raw.user_number ?? '--'} users</strong></div><div><span>Recovered watermark</span><strong>{result.raw.mark_length ?? '--'} bits · {result.raw.channel_copy ?? '--'} channel copies · {result.raw.hw_copy ?? '--'} x {result.raw.hw_copy ?? '--'} spatial copies</strong></div></div> : null}
             {isPrcAnalysis && result.raw ? <div className="repository-result-note"><div><span>Repository operation</span><strong>{isPrcDetect ? 'Detect' : 'Decode'}</strong></div><div><span>Repository decoder</span><strong>{result.raw.decoder ?? (isPrcDetect ? 'Detect' : 'Decode')}</strong></div><div><span>Decision rule</span><strong>{result.raw.decision_rule ?? (isPrcDetect ? 'Detect' : 'Decode validity')}</strong></div><div><span>PRC parameters</span><strong>n = {result.raw.codeword_length ?? '--'} · t = {result.raw.prc_t ?? '--'} · variance = {result.raw.posterior_variance ?? '--'}</strong></div><div><span>Posterior and key</span><strong>{result.raw.posterior_length ?? '--'} values · noise rate {result.raw.noise_rate ?? '--'} · {result.raw.test_bit_count ?? '--'} test bits</strong></div><div><span>Decode limit</span><strong>{result.raw.max_bp_iter ?? '--'} BP iterations{isPrcDetect ? ' (not used by Detect)' : ''}</strong></div><div><span>Message output</span><strong>{result.raw.message_available ? 'Recovered message' : 'No user message; validity only'}</strong></div><div><span>Inversion</span><strong>Order {result.raw.inversion_order ?? '--'} · empty prompt</strong></div></div> : null}
             <div className="api-note"><KeyRound size={18} /><p>{result.notes}</p></div>
             {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions">{selectedMethod.id === 'prc-watermark' ? <><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('detect')} type="button"><Search size={18} />Run Detect</button><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('decode')} type="button"><ShieldCheck size={18} />Run Decode</button></> : <button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>}{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
-          </div>
+          </div>}
         </section>
       </section>
     </main>

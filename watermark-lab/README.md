@@ -1,7 +1,7 @@
 # Watermark Lab
 
-The frontend is a single environment for exploring five upstream latent-domain
-watermark repositories:
+The frontend groups 14 watermark methods into five categories. Five methods
+have repository integrations:
 
 - SFWMark: HSQR and HSTR Fourier latent watermarking.
 - Gaussian-Shannon: Gaussian and LDPC coded message watermarking.
@@ -10,7 +10,29 @@ watermark repositories:
   latent variants.
 - PRC-Watermark: keyed pseudorandom-code generation, Detect, and Decode.
 
-Each method is organized around Generation, Verification, and Identification.
+## Catalogue
+
+| Category | Integrated | Planned |
+| --- | --- | --- |
+| Latent / Initial Noise | SFWMark, Gaussian Shannon, Gaussian Shading, PRC-Watermark | Tree-Ring, Ring-ID, WIND, T2SMark |
+| VAE / Decoder | LaWa | - |
+| Dual Domain / Semantic | - | GaussMarker, SEAL |
+| Optimization / Tamper Aware | - | ROBIN, TAG-WM |
+| Learned Detector | - | SERUM |
+
+Select a category to view its methods. Planned methods have browsable process
+rows and an explicit awaiting-implementation state. They have no executable
+controls, job history, image preview, or results, and never call the backend.
+Their workflows are preliminary outlines; exact parameters and artifact
+requirements should be finalized against each repository during integration.
+
+Category definitions and planned entries live in `src/methodCatalog.ts`.
+Integrated method definitions and the existing request mapping live in
+`src/App.tsx`. When adding an integration, replace its planned entry with an
+integrated definition, implement its backend adapter, and supply its actual
+workflows and submethods.
+
+Integrated methods expose their own generation and analysis workflows.
 Verification keeps the repository's own meaning: Fourier-pattern comparison for
 SFWMark, message extraction and BER/accuracy for Gaussian-Shannon and LaWa.
 Identification is disabled where the upstream repository has no candidate-key
