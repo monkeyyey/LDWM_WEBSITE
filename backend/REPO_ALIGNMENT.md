@@ -98,3 +98,10 @@ adds a watermark. No clean comparison image is returned or downloadable.
 There are no generic mock adapters or built-in fallback algorithms. If a
 repository checkout, dependency, checkpoint, or accelerator is missing, the
 backend returns `setup_required` or `failed` and includes the runner logs.
+# Expanded Inference Scope
+
+The nine new adapters call pinned upstream generation/analysis functions. They are experimental and have not been validated with real CUDA diffusion inference on the development Mac. Detailed source revisions, supported variants, offline preparation, omitted benchmark branches and acceptance checks are recorded in [REPOSITORY_METHOD_SETUP.md](../docs/REPOSITORY_METHOD_SETUP.md).
+
+Key distinctions: Ring-ID exposes known-key verification separately from identification; WIND full retains its search fallback; T2SMark decodes using the recovered session key; SEAL performs two generation passes; ROBIN verifies an intermediate state; TAG-WM exports an independent tamper mask; SERUM VAE-encodes before scoring without diffusion inversion. None of the continuous scores is relabeled as a calibrated detection probability/decision.
+
+The original five-method notes below remain applicable to those adapters.

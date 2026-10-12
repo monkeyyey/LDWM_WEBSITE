@@ -1,0 +1,20 @@
+# Runtime subset of WIND's published environment; CUDA validation required.
+torch==2.5.0
+torchvision==0.20.0
+diffusers==0.20.2
+transformers==4.47.1
+huggingface-hub==0.25.0
+accelerate==1.2.1
+numpy==1.26.4
+datasets==2.21.0
+scipy==1.14.1
+scikit-learn==1.6.0
+Pillow==11.0.0
+matplotlib==3.9.2
+pandas==2.2.3
+prettytable==3.12.0
+wandb==0.18.7
+ftfy==6.3.1
+regex
+timm==0.6.13
+tqdm

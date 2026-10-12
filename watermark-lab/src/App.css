@@ -1001,6 +1001,28 @@ input[type='range'] {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.repository-validation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #d9dee5;
+  font-size: 12px;
+  color: #785314;
+}
+
+.repository-validation a { color: #236e87; }
+.method-status.experimental { color: #785314; }
+.field.binary-option { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.field.binary-option input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #136f63; }
+.recovered-bits { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; max-width: 100%; }
+.tamper-result { margin: 16px 0; }
+.tamper-result img { display: block; width: min(100%, 512px); height: auto; aspect-ratio: 1; object-fit: contain; }
+.tamper-result figcaption { font-size: 13px; margin-top: 8px; }
+
 .metric {
   border: 1px solid #eeeeea;
   min-height: 74px;

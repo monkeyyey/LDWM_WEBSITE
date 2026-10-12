@@ -13,7 +13,7 @@ class ModelAdapter:
         self.method_id = method_id
         self.config = config
         self.project_root = project_root
-        env_name = {
+        env_name = config.get("repo_env") or {
             "sfwmark": "SFWMARK_REPO",
             "gaussian-shannon": "WATERMARK_GS_REPO",
             "lawa": "WATERMARK_LAWA_REPO",

@@ -1,0 +1,714 @@
+{
+  "tree-ring": {
+    "name": "Tree-Ring",
+    "repo_path": "../work/repos/Tree-Ring",
+    "repo_url": "https://github.com/YuxinWenRick/tree-ring-watermark",
+    "revision": "3015283d9cf82e90b628f02ad2121bd37408ca9a",
+    "repo_env": "WATERMARK_TREE_RING_REPO",
+    "python_env": "WATERMARK_TREE_RING_PYTHON",
+    "model_env": "WATERMARK_TREE_RING_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "legacy",
+    "variants": [
+      "ring",
+      "rand",
+      "zeros"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "detect"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "w_seed": {
+        "label": "Watermark seed",
+        "default": 999999,
+        "type": "number",
+        "min": 0,
+        "max": 2147483647,
+        "step": 1
+      },
+      "w_channel": {
+        "label": "Latent channel",
+        "default": 3,
+        "type": "select",
+        "choices": [
+          -1,
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "w_radius": {
+        "label": "Fourier radius",
+        "default": 10,
+        "type": "number",
+        "min": 1,
+        "max": 31,
+        "step": 1
+      }
+    },
+    "setup_artifacts": [],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "ring-id": {
+    "name": "RingID",
+    "repo_path": "../work/repos/RingID",
+    "repo_url": "https://github.com/showlab/RingID",
+    "revision": "45631a59aecd7d63ccdb640aaaf3e616fdb89fb9",
+    "repo_env": "WATERMARK_RING_ID_REPO",
+    "python_env": "WATERMARK_RING_ID_PYTHON",
+    "model_env": "WATERMARK_RING_ID_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "legacy",
+    "variants": [
+      "ring-id"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "verify",
+      "identify"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "assigned_keys": {
+        "label": "Candidate patterns (2048 = full bank)",
+        "default": 2048,
+        "type": "number",
+        "min": 2,
+        "max": 2048,
+        "step": 1
+      },
+      "key_index": {
+        "label": "Pattern index",
+        "default": 628,
+        "type": "number",
+        "min": 0,
+        "max": 2047,
+        "step": 1
+      },
+      "ring_value_range": {
+        "label": "Ring value range",
+        "default": 64,
+        "type": "number",
+        "min": 1,
+        "max": 256,
+        "step": 1
+      },
+      "fix_gt": {
+        "label": "Real-projection correction",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      },
+      "time_shift": {
+        "label": "Spatial time shift",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      },
+      "channel_min": {
+        "label": "Minimum channel distance",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      }
+    },
+    "setup_artifacts": [],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "wind": {
+    "name": "WIND",
+    "repo_path": "../work/repos/WIND",
+    "repo_url": "https://github.com/Kasraarabi/Hidden-in-the-Noise",
+    "revision": "e923df7f74c7e41745c071d831e4b76d04665a5a",
+    "repo_env": "WATERMARK_WIND_REPO",
+    "python_env": "WATERMARK_WIND_PYTHON",
+    "model_env": "WATERMARK_WIND_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "wind",
+    "variants": [
+      "full",
+      "fast"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "identify"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "assigned_keys": {
+        "label": "Candidate patterns (2048 = full bank)",
+        "default": 2048,
+        "type": "number",
+        "min": 2,
+        "max": 2048,
+        "step": 1
+      },
+      "ring_value_range": {
+        "label": "Ring value range",
+        "default": 64,
+        "type": "number",
+        "min": 1,
+        "max": 256,
+        "step": 1
+      },
+      "fix_gt": {
+        "label": "Real-projection correction",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      },
+      "time_shift": {
+        "label": "Spatial time shift",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      },
+      "channel_min": {
+        "label": "Minimum channel distance",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      },
+      "noise_count": {
+        "label": "Noise bank size (M)",
+        "default": 10000,
+        "type": "number",
+        "min": 2,
+        "max": 20000,
+        "step": 1
+      }
+    },
+    "setup_artifacts": [],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "t2smark": {
+    "name": "T2SMark",
+    "repo_path": "../work/repos/T2SMark",
+    "repo_url": "https://github.com/0xD009/T2SMark",
+    "revision": "0c1fbfd50fcd1fba135477a2c016e284d5d7914d",
+    "repo_env": "WATERMARK_T2SMARK_REPO",
+    "python_env": "WATERMARK_T2SMARK_PYTHON",
+    "model_env": "WATERMARK_T2SMARK_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1",
+    "profile": "t2s",
+    "variants": [
+      "sd21"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "detect",
+      "decode"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 10,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "key_length": {
+        "label": "Session-key bits",
+        "default": 16,
+        "type": "select",
+        "choices": [
+          8,
+          16,
+          32
+        ]
+      },
+      "msg_length": {
+        "label": "Message bits",
+        "default": 256,
+        "type": "select",
+        "choices": [
+          64,
+          128,
+          256,
+          512
+        ]
+      },
+      "key_channel_idx": {
+        "label": "Key channel",
+        "default": 0,
+        "type": "select",
+        "choices": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "tau": {
+        "label": "Tail threshold",
+        "default": 0.674,
+        "type": "number",
+        "min": 0.01,
+        "max": 2,
+        "step": 0.001
+      }
+    },
+    "setup_artifacts": [],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "gaussmarker": {
+    "name": "GaussMarker",
+    "repo_path": "../work/repos/GaussMarker",
+    "repo_url": "https://github.com/SunnierLee/GaussMarker",
+    "revision": "4ac9bfd4e152a56bd93c2a06a809ef6ff8e73155",
+    "repo_env": "WATERMARK_GAUSSMARKER_REPO",
+    "python_env": "WATERMARK_GAUSSMARKER_PYTHON",
+    "model_env": "WATERMARK_GAUSSMARKER_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "legacy",
+    "variants": [
+      "chacha"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "detect"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "w_seed": {
+        "label": "Fourier watermark seed",
+        "default": 999999,
+        "type": "number",
+        "min": 0,
+        "max": 2147483647,
+        "step": 1
+      },
+      "w_radius": {
+        "label": "Fourier radius",
+        "default": 4,
+        "type": "number",
+        "min": 1,
+        "max": 31,
+        "step": 1
+      },
+      "model_nf": {
+        "label": "Restorer width",
+        "default": 128,
+        "type": "select",
+        "choices": [
+          32,
+          64,
+          128
+        ]
+      },
+      "classifier_type": {
+        "label": "Restorer input (0 = noise; 1 = conditioned)",
+        "default": 0,
+        "type": "select",
+        "choices": [
+          0,
+          1
+        ]
+      }
+    },
+    "setup_artifacts": [
+      "WATERMARK_GAUSSMARKER_GNR",
+      "WATERMARK_GAUSSMARKER_W1"
+    ],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "seal": {
+    "name": "SEAL",
+    "repo_path": "../work/repos/SEAL",
+    "repo_url": "https://github.com/Kasraarabi/SEAL",
+    "revision": "92d31b31b93a6e373fe88a584c640beafb68c6fa",
+    "repo_env": "WATERMARK_SEAL_REPO",
+    "python_env": "WATERMARK_SEAL_PYTHON",
+    "model_env": "WATERMARK_SEAL_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "seal",
+    "variants": [
+      "seal"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "verify"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "k": {
+        "label": "Semantic noise patches (k)",
+        "default": 1024,
+        "type": "select",
+        "choices": [
+          64,
+          256,
+          1024
+        ]
+      },
+      "b": {
+        "label": "Hash bits (b)",
+        "default": 7,
+        "type": "number",
+        "min": 1,
+        "max": 16,
+        "step": 1
+      }
+    },
+    "setup_artifacts": [],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "robin": {
+    "name": "ROBIN",
+    "repo_path": "../work/repos/ROBIN",
+    "repo_url": "https://github.com/Hannah1102/ROBIN",
+    "revision": "6b2c2ddf5e50d7d75c71a41c84a7781d2826be1f",
+    "repo_env": "WATERMARK_ROBIN_REPO",
+    "python_env": "WATERMARK_ROBIN_PYTHON",
+    "model_env": "WATERMARK_ROBIN_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "legacy",
+    "variants": [
+      "robin"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "verify"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 1.5,
+        "max": 30,
+        "step": 0.5
+      },
+      "w_channel": {
+        "label": "Latent channel",
+        "default": 3,
+        "type": "select",
+        "choices": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "w_low_radius": {
+        "label": "Inner Fourier radius",
+        "default": 5,
+        "type": "number",
+        "min": 0,
+        "max": 29,
+        "step": 1
+      },
+      "w_up_radius": {
+        "label": "Outer Fourier radius",
+        "default": 30,
+        "type": "number",
+        "min": 1,
+        "max": 31,
+        "step": 1
+      },
+      "injection_step": {
+        "label": "Injection step",
+        "default": 35,
+        "type": "number",
+        "min": 1,
+        "max": 199,
+        "step": 1
+      }
+    },
+    "setup_artifacts": [
+      "WATERMARK_ROBIN_CHECKPOINT"
+    ],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "tag-wm": {
+    "name": "TAG-WM",
+    "repo_path": "../work/repos/TAG-WM",
+    "repo_url": "https://github.com/Suchenl/TAG-WM",
+    "revision": "74890e38211a986aebda95c4c3dd160578632977",
+    "repo_env": "WATERMARK_TAG_WM_REPO",
+    "python_env": "WATERMARK_TAG_WM_PYTHON",
+    "model_env": "WATERMARK_TAG_WM_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "tag",
+    "variants": [
+      "trainable",
+      "trainfree"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "decode",
+      "localize"
+    ],
+    "requires_source_job": true,
+    "options": {
+      "inference_steps": {
+        "label": "Generation steps",
+        "default": 50,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "inversion_steps": {
+        "label": "Inversion steps",
+        "default": 10,
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "step": 1
+      },
+      "guidance_scale": {
+        "label": "Guidance scale",
+        "default": 7.5,
+        "type": "number",
+        "min": 0,
+        "max": 30,
+        "step": 0.5
+      },
+      "wm_len": {
+        "label": "Message bits",
+        "default": 256,
+        "type": "select",
+        "choices": [
+          64,
+          128,
+          256,
+          512
+        ]
+      },
+      "tamper_confidence": {
+        "label": "Tamper confidence",
+        "default": 0.7,
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "step": 0.05
+      },
+      "calc_wm_use_tamper_loc": {
+        "label": "Tamper-aware decoding",
+        "default": 1,
+        "type": "toggle",
+        "choices": [
+          1,
+          0
+        ]
+      }
+    },
+    "setup_artifacts": [
+      "WATERMARK_TAG_WM_DVRD"
+    ],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  },
+  "serum": {
+    "name": "SERUM",
+    "repo_path": "../work/repos/SERUM",
+    "repo_url": "https://github.com/Hubizon/SERUM",
+    "revision": "02f4929e30cd976c5cfe65a45ef1bc4ac79bdfed",
+    "repo_env": "WATERMARK_SERUM_REPO",
+    "python_env": "WATERMARK_SERUM_PYTHON",
+    "model_env": "WATERMARK_SERUM_MODEL_ID",
+    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "profile": "serum",
+    "variants": [
+      "serum"
+    ],
+    "adapter_workflows": [
+      "generate",
+      "detect"
+    ],
+    "requires_source_job": true,
+    "options": {},
+    "setup_artifacts": [
+      "WATERMARK_SERUM_CONFIG",
+      "WATERMARK_SERUM_WATERMARK",
+      "WATERMARK_SERUM_DETECTOR"
+    ],
+    "validation": "Awaiting CUDA validation",
+    "inference_only": true,
+    "implementation_status": "experimental"
+  }
+}

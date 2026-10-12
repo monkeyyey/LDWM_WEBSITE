@@ -31,7 +31,7 @@ def save_image_input(project_root: Path, request: WatermarkRequest, job_id: str)
         return None
     upload_dir = project_root / "backend" / "storage" / "uploads" / job_id
     upload_dir.mkdir(parents=True, exist_ok=True)
-    image_path = upload_dir / (request.image_name or "upload.png")
+    image_path = upload_dir / Path(request.image_name or "upload.png").name
     image_path.write_bytes(base64.b64decode(encoded))
     return image_path
 
@@ -113,6 +113,8 @@ def run_repo_script(
 
     image_url = _storage_url(project_root, payload.get("image_path"))
     raw = payload.get("raw") if isinstance(payload.get("raw"), dict) else {}
+    if raw.get("mask_path"):
+        raw["mask_url"] = _storage_url(project_root, raw.pop("mask_path"))
     raw.update({"command": command, "runner_stdout": completed.stdout[-4000:]})
     if request.workflow == "generate" and payload.get("status", "completed") == "completed" and image_url:
         raw["job_number"] = record_generation_job(project_root, job_id, request)

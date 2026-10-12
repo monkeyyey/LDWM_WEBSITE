@@ -20,9 +20,14 @@ import {
 } from 'lucide-react'
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { categories, plannedMethods, type CategoryId, type PlannedMethodId, type WorkflowId } from './methodCatalog'
+import { categories, repositoryMethods, type CategoryId, type RepositoryMethodId, type WorkflowId } from './methodCatalog'
+import repositoryCatalog from '../../backend/config/repository_methods.json'
 
-type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa' | 'gaussian-shading' | 'prc-watermark' | PlannedMethodId
+type OptionSpec = { label: string; type: string; default: number; min?: number; max?: number; step?: number; choices?: number[] }
+type RepositorySpec = { variants: string[]; adapter_workflows: string[]; options: Record<string, OptionSpec>; repo_url: string; validation: string }
+const repositorySpecs: Partial<Record<MethodId, RepositorySpec>> = repositoryCatalog
+
+type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa' | 'gaussian-shading' | 'prc-watermark' | RepositoryMethodId
 type BackendWorkflow = 'detect' | 'generate'
 
 type WorkflowSpec = {
@@ -59,7 +64,7 @@ type Method = {
   name: string
   shortName: string
   categoryId: CategoryId
-  status: 'integrated' | 'planned'
+  status: 'integrated' | 'experimental' | 'planned'
   category: string
   mechanism: string
   bestFor: string
@@ -93,6 +98,9 @@ type BackendResult = {
   runtime: string
   image_url?: string | null
   raw?: {
+    summary?: string
+    metrics?: { label: string; value: number | string | boolean }[]
+    mask_url?: string
     wm_type?: string
     model_id?: string
     matched?: boolean
@@ -140,6 +148,7 @@ type BackendResult = {
 }
 
 type RepositoryOptions = {
+  [key: string]: number
   fpr: number
   user_number: number
   channel_copy: number
@@ -291,29 +300,31 @@ const methods: Method[] = [
       { id: 'prc', name: 'PRC', description: 'The released implementation uses one PRC path with a 16,384-symbol codeword. Detect and Decode are separate operations; the original decode.py runs both and reports an optional OR combination.', payload: 'Keyed binary presence decision', defaultMessage: 'Generated keyed PRC codeword', messageMode: 'generated', repoDefaults: ['codeword: 16,384 symbols', 'FPR: 1e-5', 'parity sparsity t: 3', 'posterior variance: 1.5'], workflows: prcWorkflows },
     ],
   },
-  ...plannedMethods.map((method): Method => ({
+  ...repositoryMethods.map((method): Method => ({
     ...method,
-    status: 'planned',
+    status: 'experimental',
     bestFor: method.payload,
     color: categories.find((category) => category.id === method.categoryId)!.color,
-    submethods: [{
-      id: method.id,
-      name: method.name,
+    submethods: repositorySpecs[method.id]!.variants.map((variant) => ({
+      id: variant,
+      name: `${method.name} / ${variant}`,
       description: method.mechanism,
       payload: method.payload,
-      defaultMessage: '',
-      repoDefaults: [],
-      workflows: method.processes.map((process) => ({
+      defaultMessage: method.payload,
+      messageMode: 'generated',
+      repoDefaults: ['512 x 512', 'NVIDIA CUDA', 'Pinned upstream checkout', 'Awaiting GPU validation'],
+      workflows: [...method.processes].sort((a, b) => Number(b.workflow === 'generate') - Number(a.workflow === 'generate')).map((process) => ({
         id: process.workflow,
         label: process.label,
         description: process.steps.join(' -> '),
-        backendWorkflow: null,
-        available: false,
+        backendWorkflow: process.workflow === 'generate' ? 'generate' : 'detect',
+        available: repositorySpecs[method.id]!.adapter_workflows.includes(process.workflow),
+        unavailableReason: 'Offline preparation required; see the repository setup guide.',
         inputs: [process.steps[0]],
         outputs: [process.steps[process.steps.length - 1]],
-        source: 'Awaiting repository integration; inputs, parameters, and artifacts will be finalized during implementation.',
+        source: 'Pinned upstream functions. Analysis reuses the model, parameters and artifacts saved with the generation job. CUDA validation pending.',
       })),
-    }],
+    })),
   })),
 ]
 
@@ -328,6 +339,7 @@ function defaultRepositoryOptions(methodId: MethodId): RepositoryOptions {
     prc_t: 3,
     posterior_variance: 1.5,
     inference_steps: 50,
+    ...Object.fromEntries(Object.entries(repositorySpecs[methodId]?.options ?? {}).map(([key, spec]) => [key, spec.default])),
   }
 }
 
@@ -359,6 +371,7 @@ function App() {
   const selectedCategory = categories.find((category) => category.id === categoryId) ?? categories[0]
   const categoryMethods = methods.filter((method) => method.categoryId === categoryId)
   const isPlanned = selectedMethod.status === 'planned'
+  const repositorySpec = repositorySpecs[selectedMethod.id]
   const selectedSubmethod = useMemo(() => selectedMethod.submethods.find((submethod) => submethod.id === submethodId) ?? selectedMethod.submethods[0], [selectedMethod, submethodId])
   const selectedWorkflow = useMemo(() => selectedSubmethod.workflows.find((workflow) => workflow.id === workflowId) ?? selectedSubmethod.workflows[0], [selectedSubmethod, workflowId])
   const isGeneration = selectedWorkflow.id === 'generate'
@@ -367,9 +380,9 @@ function App() {
   const isPrcAnalysis = selectedMethod.id === 'prc-watermark' && (selectedWorkflow.id === 'detect' || selectedWorkflow.id === 'decode')
   const isPrcDetect = selectedWorkflow.id === 'detect'
   const usesGeneratedPayload = selectedSubmethod.messageMode === 'generated'
-  const requiresSourceKey = ['sfwmark', 'gaussian-shading', 'prc-watermark'].includes(selectedMethod.id)
+  const requiresSourceKey = Boolean(repositorySpec) || ['sfwmark', 'gaussian-shading', 'prc-watermark'].includes(selectedMethod.id)
   const messageLockedToJob = usesGeneratedPayload || (!isGeneration && selectedMethod.id !== 'sfwmark' && Boolean(sourceJobId))
-  const messageFieldLabel = selectedMethod.id === 'sfwmark'
+  const messageFieldLabel = repositorySpec ? 'Repository-generated watermark' : selectedMethod.id === 'sfwmark'
     ? 'Watermark variant'
     : selectedMethod.id === 'gaussian-shannon'
       ? messageLockedToJob ? 'Embedded message (256 bits; linked job)' : 'Expected message (256 binary bits)'
@@ -532,7 +545,7 @@ function App() {
     }
   }
 
-  function analyzeGeneratedImage(nextWorkflow: 'verify' | 'detect' | 'decode') {
+  function analyzeGeneratedImage(nextWorkflow: WorkflowId) {
     if (!uploadedImage || !sourceJobId) return
     setWorkflowId(nextWorkflow)
     void runBackendJob(nextWorkflow)
@@ -568,6 +581,7 @@ function App() {
     if (backendResult.status === 'failed' || backendResult.status === 'setup_required' || backendResult.status === 'unsupported') return backendResult.recovered_payload || 'The backend could not complete this run.'
     if (workflow === 'generate') return imageUrl ? `${selectedSubmethod.name} watermarked image generated and ready for analysis.` : `${selectedSubmethod.name} generation completed.`
     const raw = backendResult.raw
+    if (raw?.summary) return raw.summary
     if (workflow === 'verify' && selectedMethod.id === 'sfwmark' && raw) return `Verification distance against the ground-truth pattern: ${typeof raw.verification_distance === 'number' ? raw.verification_distance.toFixed(4) : 'recorded'}. The original repo uses this distance for ROC evaluation.`
     if (workflow === 'verify' && selectedMethod.id === 'gaussian-shading' && raw) return `Recovered ${raw.mark_length ?? 'the'} watermark bits with ${typeof raw.bit_accuracy === 'number' ? `${(raw.bit_accuracy * 100).toFixed(2)}%` : 'recorded'} accuracy. Detection and traceability use the repository's separate FPR-derived thresholds.`
     if (workflow === 'detect' && selectedMethod.id === 'prc-watermark' && raw) return `PRC Detect returned ${raw.detection_result ? 'watermark detected' : 'watermark not detected'} using the target false-positive rate.`
@@ -594,7 +608,7 @@ function App() {
           <div><p className="eyebrow">Latent Domain</p><h1>Watermark Lab</h1><span className="owner-name">Chern Ze Hou</span></div>
         </div>
         <div className="sidebar-context"><strong>{selectedMethod.name}</strong><span>{isPlanned ? 'Planned integration' : selectedSubmethod.name} · {selectedWorkflow.label}</span></div>
-        <div className="deployment"><Cloud size={18} /><div><strong>Method catalogue</strong><span>{integratedMethodCount} integrated · {methods.length - integratedMethodCount} planned</span></div></div>
+        <div className="deployment"><Cloud size={18} /><div><strong>Method catalogue</strong><span>{integratedMethodCount} existing · {repositoryMethods.length} experimental</span></div></div>
       </aside>
 
       <section className="workspace">
@@ -617,7 +631,7 @@ function App() {
 
         <div className="category-heading"><h3>{selectedCategory.name}</h3><span>{categoryMethods.length} {categoryMethods.length === 1 ? 'method' : 'methods'}</span></div>
         <section className="method-grid" aria-label={`${selectedCategory.name} methods`}>
-          {categoryMethods.map((method) => <button aria-pressed={method.id === selectedMethod.id} className={`method-card ${method.id === selectedMethod.id ? 'selected' : ''}`} key={method.id} onClick={() => selectMethod(method.id)} style={{ '--method-color': method.color } as CSSProperties} type="button"><span className="method-token">{method.shortName}</span><span className="method-copy"><strong>{method.name}</strong><small>{method.category}</small><span className={`method-status ${method.status}`}>{method.status === 'integrated' ? <CheckCircle2 aria-hidden="true" size={12} /> : <LockKeyhole aria-hidden="true" size={12} />}{method.status === 'integrated' ? 'Integrated' : 'Planned'}</span></span></button>)}
+          {categoryMethods.map((method) => <button aria-pressed={method.id === selectedMethod.id} className={`method-card ${method.id === selectedMethod.id ? 'selected' : ''}`} key={method.id} onClick={() => selectMethod(method.id)} style={{ '--method-color': method.color } as CSSProperties} type="button"><span className="method-token">{method.shortName}</span><span className="method-copy"><strong>{method.name}</strong><small>{method.category}</small><span className={`method-status ${method.status}`}>{method.status === 'experimental' ? <Activity aria-hidden="true" size={12} /> : method.status === 'integrated' ? <CheckCircle2 aria-hidden="true" size={12} /> : <LockKeyhole aria-hidden="true" size={12} />}{method.status === 'experimental' ? 'Experimental' : method.status === 'integrated' ? 'Integrated' : 'Planned'}</span></span></button>)}
         </section>
 
         <section className="method-navigation" aria-label={`${selectedMethod.name} submethods and workflows`}>
@@ -633,6 +647,7 @@ function App() {
           </section> : <>
           <div className="control-panel">
             <div className="section-heading"><SlidersHorizontal size={18} /><div><h3>{selectedWorkflow.label}</h3><p className="heading-description">{selectedWorkflow.description}</p></div></div>
+            {repositorySpec && <div className="repository-validation"><strong>Experimental integration · GPU validation pending</strong><a href={repositorySpec.repo_url} target="_blank" rel="noreferrer">Official repository</a></div>}
 
             {isGeneration ? <label className="field"><span>Prompt</span><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} /></label> : null}
             {needsImage ? <>
@@ -662,9 +677,13 @@ function App() {
               <label className="field"><span>Diffusion steps</span><input min="1" max="200" step="1" type="number" value={repositoryOptions.inference_steps} onChange={(event) => setRepositoryOptions((current) => ({ ...current, inference_steps: Number(event.target.value) }))} /></label>
             </div> : null}
 
+            {isGeneration && repositorySpec && <div className="option-grid" aria-label={`${selectedMethod.name} repository options`}>
+              {Object.entries(repositorySpec.options).map(([key, spec]) => <label className={`field ${spec.type === 'toggle' ? 'binary-option' : ''}`} key={key}><span>{spec.label}</span>{spec.type === 'toggle' ? <input type="checkbox" checked={Boolean(repositoryOptions[key])} onChange={(event) => setRepositoryOptions((current) => ({ ...current, [key]: Number(event.target.checked) }))} /> : spec.type === 'select' ? <select value={repositoryOptions[key]} onChange={(event) => setRepositoryOptions((current) => ({ ...current, [key]: Number(event.target.value) }))}>{spec.choices!.map((value) => <option key={value} value={value}>{value}</option>)}</select> : <input type="number" min={spec.min} max={spec.max} step={spec.step} value={repositoryOptions[key]} onChange={(event) => setRepositoryOptions((current) => ({ ...current, [key]: Number(event.target.value) }))} />}</label>)}
+            </div>}
+
             <div className="form-actions">
               <button className="reset-button" onClick={resetRun} type="button"><RotateCcw size={17} />Reset</button>
-              <button className="primary-button" disabled={result.status === 'running' || !selectedWorkflow.available} onClick={() => runBackendJob()} type="button"><Play size={17} />{result.status === 'running' ? 'Running...' : `Run ${selectedWorkflow.label}`}</button>
+              <button className="primary-button" disabled={result.status === 'running' || !selectedWorkflow.available || (!isGeneration && (!uploadedImage || (requiresSourceKey && !sourceJobId)))} onClick={() => runBackendJob()} type="button"><Play size={17} />{result.status === 'running' ? 'Running...' : `Run ${selectedWorkflow.label}`}</button>
             </div>
           </div>
 
@@ -685,12 +704,14 @@ function App() {
           </section>
 
           {!isPlanned && <div className="result-panel"><div className="section-heading"><Activity size={18} /><div><h3>Results</h3><p className="heading-description">Repository output for the selected action.</p></div></div><div className={`status-strip ${result.status} ${result.isError ? 'error' : ''}`}>{result.status === 'done' ? <CheckCircle2 size={18} /> : <Gauge size={18} />}<span>{result.title}</span></div>
-            <div className="metric-grid">{result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' ? <><div className="metric"><span>Detection</span><strong>{result.raw?.detected === undefined ? '--' : result.raw.detected ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Traceability</span><strong>{result.raw?.traceable === undefined ? '--' : result.raw.traceable ? 'Passed' : 'Not passed'}</strong></div><div className="metric"><span>Bit accuracy</span><strong>{typeof result.raw?.bit_accuracy === 'number' ? `${(result.raw.bit_accuracy * 100).toFixed(2)}%` : '--'}</strong></div><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div></> : isPrcAnalysis ? isPrcDetect ? <><div className="metric"><span>Detect result</span><strong>{result.raw?.detection_result === undefined ? '--' : result.raw.detection_result ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : <><div className="metric"><span>Decode validity</span><strong>{result.raw?.decoding_result === undefined ? '--' : result.raw.decoding_result ? 'Valid' : 'Invalid'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
+            <div className="metric-grid">{repositorySpec && result.workflow !== 'generate' ? <>{(result.raw?.metrics ?? [{ label: 'Repository result', value: '--' }]).map((metric) => <div className="metric" key={metric.label}><span>{metric.label}</span><strong>{typeof metric.value === 'boolean' ? metric.value ? 'Yes' : 'No' : metric.value}</strong></div>)}</> : result.workflow === 'generate' ? <><div className="metric"><span>Generation job</span><strong>{result.jobNumber ? `Job #${result.jobNumber}` : result.jobId ? `Job ${result.jobId}` : '--'}</strong></div><div className="metric"><span>Submethod</span><strong>{selectedSubmethod.name}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Output</span><strong>{result.imageUrl ? 'Watermarked image' : '--'}</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'sfwmark' ? <><div className="metric"><span>GT pattern distance</span><strong>{typeof result.raw?.verification_distance === 'number' ? result.raw.verification_distance.toFixed(4) : '--'}</strong></div><div className="metric"><span>Expected key</span><strong>{result.raw?.key_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Repo metric</span><strong>ROC distance</strong></div></> : result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' ? <><div className="metric"><span>Detection</span><strong>{result.raw?.detected === undefined ? '--' : result.raw.detected ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Traceability</span><strong>{result.raw?.traceable === undefined ? '--' : result.raw.traceable ? 'Passed' : 'Not passed'}</strong></div><div className="metric"><span>Bit accuracy</span><strong>{typeof result.raw?.bit_accuracy === 'number' ? `${(result.raw.bit_accuracy * 100).toFixed(2)}%` : '--'}</strong></div><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div></> : isPrcAnalysis ? isPrcDetect ? <><div className="metric"><span>Detect result</span><strong>{result.raw?.detection_result === undefined ? '--' : result.raw.detection_result ? 'Detected' : 'Not detected'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : <><div className="metric"><span>Decode validity</span><strong>{result.raw?.decoding_result === undefined ? '--' : result.raw.decoding_result ? 'Valid' : 'Invalid'}</strong></div><div className="metric"><span>Target FPR</span><strong>{result.raw?.fpr ?? '--'}</strong></div><div className="metric"><span>Codeword length</span><strong>{result.raw?.codeword_length ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div></> : result.workflow === 'identify' ? <><div className="metric"><span>Identification</span><strong>{result.raw?.identified === undefined ? '--' : result.raw.identified ? 'Correct' : 'Incorrect'}</strong></div><div className="metric"><span>Predicted key</span><strong>{result.raw?.predicted_index ?? '--'}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Candidate bank</span><strong>2048 patterns</strong></div></> : <><div className="metric"><span>Bit error rate</span><strong>{result.bitErrorRate ?? '--'}</strong></div><div className="metric"><span>Recovered output</span><strong>{result.bits}</strong></div><div className="metric"><span>Runtime</span><strong>{result.runtime}</strong></div><div className="metric"><span>Payload</span><strong>{selectedSubmethod.payload}</strong></div></>}</div>
+            {repositorySpec && result.workflow === 'decode' && result.bits !== '--' && !result.isError && <pre className="recovered-bits" aria-label="Recovered watermark bits">{result.bits}</pre>}
+            {result.raw?.mask_url && <figure className="tamper-result"><img src={`${fileBase}${result.raw.mask_url}`} alt="Predicted tamper localization mask" /><figcaption>Predicted tamper mask</figcaption></figure>}
             {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shannon' && result.raw ? <div className="repository-result-note"><div><span>Repository decoding</span><strong>{result.raw.coding ?? selectedSubmethod.name} · {result.raw.redundancy ?? '--'} redundant copies · {result.raw.num_elements ?? '--'} extracted symbols</strong></div><div><span>Decision rule</span><strong>{result.raw.decoder ?? 'majority vote'}</strong></div><div><span>Verification score</span><strong>{result.score}% bit accuracy</strong></div></div> : null}
             {result.workflow === 'verify' && selectedMethod.id === 'gaussian-shading' && result.raw ? <div className="repository-result-note"><div><span>Detection threshold</span><strong>{typeof result.raw.tau_detection === 'number' ? result.raw.tau_detection.toFixed(4) : '--'} accuracy at FPR {result.raw.fpr ?? '--'}</strong></div><div><span>Traceability threshold</span><strong>{typeof result.raw.tau_traceability === 'number' ? result.raw.tau_traceability.toFixed(4) : '--'} across {result.raw.user_number ?? '--'} users</strong></div><div><span>Recovered watermark</span><strong>{result.raw.mark_length ?? '--'} bits · {result.raw.channel_copy ?? '--'} channel copies · {result.raw.hw_copy ?? '--'} x {result.raw.hw_copy ?? '--'} spatial copies</strong></div></div> : null}
             {isPrcAnalysis && result.raw ? <div className="repository-result-note"><div><span>Repository operation</span><strong>{isPrcDetect ? 'Detect' : 'Decode'}</strong></div><div><span>Repository decoder</span><strong>{result.raw.decoder ?? (isPrcDetect ? 'Detect' : 'Decode')}</strong></div><div><span>Decision rule</span><strong>{result.raw.decision_rule ?? (isPrcDetect ? 'Detect' : 'Decode validity')}</strong></div><div><span>PRC parameters</span><strong>n = {result.raw.codeword_length ?? '--'} · t = {result.raw.prc_t ?? '--'} · variance = {result.raw.posterior_variance ?? '--'}</strong></div><div><span>Posterior and key</span><strong>{result.raw.posterior_length ?? '--'} values · noise rate {result.raw.noise_rate ?? '--'} · {result.raw.test_bit_count ?? '--'} test bits</strong></div><div><span>Decode limit</span><strong>{result.raw.max_bp_iter ?? '--'} BP iterations{isPrcDetect ? ' (not used by Detect)' : ''}</strong></div><div><span>Message output</span><strong>{result.raw.message_available ? 'Recovered message' : 'No user message; validity only'}</strong></div><div><span>Inversion</span><strong>Order {result.raw.inversion_order ?? '--'} · empty prompt</strong></div></div> : null}
             <div className="api-note"><KeyRound size={18} /><p>{result.notes}</p></div>
-            {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions">{selectedMethod.id === 'prc-watermark' ? <><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('detect')} type="button"><Search size={18} />Run Detect</button><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('decode')} type="button"><ShieldCheck size={18} />Run Decode</button></> : <button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>}{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
+            {isGeneration && uploadedImage && sourceJobId && !result.isError ? <div className="result-actions">{repositorySpec ? selectedSubmethod.workflows.filter((item) => item.available && item.id !== 'generate').map((item) => <button className="secondary-button" key={item.id} disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage(item.id)} type="button"><Search size={18} />{item.label}</button>) : selectedMethod.id === 'prc-watermark' ? <><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('detect')} type="button"><Search size={18} />Run Detect</button><button className="secondary-button" disabled={result.status === 'running'} onClick={() => analyzeGeneratedImage('decode')} type="button"><ShieldCheck size={18} />Run Decode</button></> : <button className="secondary-button" onClick={detectGeneratedImage} type="button"><ShieldCheck size={18} />Verify this image</button>}{result.imageUrl ? <a className="download-link" href={result.imageUrl} download><Download size={18} />Download watermarked image</a> : null}</div> : null}
           </div>}
         </section>
       </section>
