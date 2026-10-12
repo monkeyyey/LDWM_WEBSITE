@@ -34,6 +34,15 @@ class AdapterContracts(unittest.TestCase):
         args.update(kwargs)
         return WatermarkRequest(**args)
 
+    def test_model_revision_defaults_to_fp16_and_can_be_overridden(self):
+        import noise_methods
+        from types import SimpleNamespace
+
+        context = SimpleNamespace(request={"method": "tree-ring"})
+        self.assertEqual(noise_methods.pipeline_revision(context), "fp16")
+        with patch.dict("os.environ", {"WATERMARK_TREE_RING_MODEL_REVISION": "main"}):
+            self.assertEqual(noise_methods.pipeline_revision(context), "main")
+
     def source(self, **overrides):
         source = self.root / "backend/storage/outputs/123456abcdef"
         source.mkdir(parents=True)

@@ -1,12 +1,19 @@
 """Single-image entry points adapted from the upstream generation/evaluation loops."""
 import importlib
 import itertools
+import os
 import random
 from types import SimpleNamespace
 
+
+def pipeline_revision(c):
+    method = c.request["method"].upper().replace("-", "_")
+    return os.environ.get(f"WATERMARK_{method}_MODEL_REVISION", "fp16")
+
+
 def pipeline(c, module="inverse_stable_diffusion", scheduler=True):
     import torch
-    kwargs = {"torch_dtype": torch.float16, "revision": "fp16"}
+    kwargs = {"torch_dtype": torch.float16, "revision": pipeline_revision(c)}
     if scheduler:
         from diffusers import DPMSolverMultistepScheduler
         kwargs["scheduler"] = DPMSolverMultistepScheduler.from_pretrained(c.model, subfolder="scheduler")

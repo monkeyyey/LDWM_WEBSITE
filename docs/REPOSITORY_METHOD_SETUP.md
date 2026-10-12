@@ -24,7 +24,7 @@ The full pinned commit is stored in `backend/config/repository_methods.json`. Th
 | TAG-WM | [Official source](https://github.com/Suchenl/TAG-WM/tree/74890e38211a986aebda95c4c3dd160578632977) | `74890e38211a` | `tag.txt` |
 | SERUM | [Official source](https://github.com/Hubizon/SERUM/tree/02f4929e30cd976c5cfe65a45ef1bc4ac79bdfed) | `02f4929e30cd` | `serum.txt` |
 
-Profiles in `backend/integrations/repository_methods/requirements/` are inference-focused dependency sets, not GPU-validated lockfiles. Core diffusion versions follow upstream; compatibility pins and omitted benchmark-only packages are documented in the files. Do not install all methods into one environment.
+Profiles in `backend/integrations/repository_methods/requirements/` are inference-focused dependency sets, not GPU-validated lockfiles. Core diffusion versions follow upstream; compatibility pins and omitted benchmark-only packages are documented in the files. A method needs its own pinned source checkout and may need its own model or trained artifacts, but it does **not** automatically need its own Python environment. These integrations launch isolated subprocesses, so methods can share an environment when their dependency profiles are compatible. Do not combine profiles with conflicting pins just to reduce setup.
 
 ## 1. Prepare the GPU server
 
@@ -41,31 +41,46 @@ This downloads only source into `work/repos/`, not model weights. Source copies 
 
 Plan disk space for model caches and private job state. Ring-ID's 2,048 complex-valued patterns and WIND's 10,000-noise registry can consume substantial RAM, VRAM and disk. Start WIND full-mode validation with a small registry (e.g. 16 groups and 32 noises); increase only after checking memory. SEAL additionally loads BLIP-2 and a sentence encoder. Actual GPU memory requirements need measurement on your machine.
 
-## 2. Create isolated environments
+## 2. Create runtime environments
 
-Example for Tree-Ring, using Conda:
+Start with one environment per distinct dependency profile, not one per method. The current candidate groups are:
+
+| Environment | Methods | Requirements profile | Sharing note |
+| --- | --- | --- | --- |
+| `ldwm-legacy` | Tree-Ring, RingID, GaussMarker, ROBIN | `legacy.txt` | Same exact pins; GaussMarker and ROBIN still need their own trained artifacts. |
+| `ldwm-wind` | WIND, SEAL | `wind.txt` plus `seal.txt` additions | `seal.txt` includes `wind.txt`, so SEAL can use this environment. |
+| `ldwm-t2smark` | T2SMark | `t2s.txt` | Separate Diffusers/Transformers pins from WIND. |
+| `ldwm-tag-wm` | TAG-WM | `tag.txt` | Keep separate initially because its Transformers and Hub pins differ from `legacy.txt`. |
+| `ldwm-serum` | SERUM | `serum.txt` | Separate modern PyTorch/Diffusers stack. |
+
+These are candidate groups based on the checked-in pins, not a claim that GPU inference has already been validated. If an upstream import or runtime check reveals an incompatibility, split only the affected method into its own environment. Source checkouts remain method-specific even when their Python environment is shared.
+
+Example for the shared legacy environment, using Conda:
 
 ```bash
-conda create -n ldwm-tree-ring python=3.10 -y
-conda run -n ldwm-tree-ring python -m pip install -r backend/integrations/repository_methods/requirements/legacy.txt
-conda run -n ldwm-tree-ring python -m pip check
-conda run -n ldwm-tree-ring python -c "import sys, torch; print(sys.executable); print(torch.cuda.is_available())"
+conda create -n ldwm-legacy python=3.10 -y
+conda run -n ldwm-legacy python -m pip install -r backend/integrations/repository_methods/requirements/legacy.txt
+conda run -n ldwm-legacy python -m pip check
+conda run -n ldwm-legacy python -c "import sys, torch; print(sys.executable); print(torch.cuda.is_available())"
 ```
 
-Repeat with a separate environment and the profile in the source table for each method. Recommended names: `ldwm-ring-id`, `ldwm-wind`, `ldwm-t2smark`, `ldwm-gaussmarker`, `ldwm-seal`, `ldwm-robin`, `ldwm-tag-wm`, `ldwm-serum`.
+For SEAL, install `seal.txt` in the WIND environment; it pulls in the shared WIND pins plus SEAL's additional packages. Create the other environments from their corresponding profile in the table. `pip check` and a CUDA availability check are necessary but not sufficient: run the repository check and a real generation/detection smoke test for every method before treating a shared group as validated.
 
 For CUDA wheel selection, follow the upstream PyTorch version and your server driver. Do not silently upgrade diffusers to resolve dependency problems: these repositories subclass older diffusion pipelines. The legacy methods use torch 1.13.0 / torchvision 0.14.0. WIND, T2SMark and SEAL use torch 2.5.0 / torchvision 0.20.0. SERUM uses torch 2.7.1 / torchvision 0.22.1; its upstream instructions specify CUDA 11.8 wheels.
 
-Set the backend environment variables to the **absolute Python executable paths** printed by each environment:
+Set the backend environment variables to the **absolute Python executable paths** printed by each environment. Methods in a shared group should point to the same executable:
 
 ```bash
-export WATERMARK_TREE_RING_PYTHON="$(conda run -n ldwm-tree-ring python -c 'import sys; print(sys.executable)')"
-export WATERMARK_RING_ID_PYTHON="$(conda run -n ldwm-ring-id python -c 'import sys; print(sys.executable)')"
+export WATERMARK_TREE_RING_PYTHON="$(conda run -n ldwm-legacy python -c 'import sys; print(sys.executable)')"
+export WATERMARK_RING_ID_PYTHON="$(conda run -n ldwm-legacy python -c 'import sys; print(sys.executable)')"
+export WATERMARK_GAUSSMARKER_PYTHON="$(conda run -n ldwm-legacy python -c 'import sys; print(sys.executable)')"
+export WATERMARK_ROBIN_PYTHON="$(conda run -n ldwm-legacy python -c 'import sys; print(sys.executable)')"
 export WATERMARK_WIND_PYTHON="$(conda run -n ldwm-wind python -c 'import sys; print(sys.executable)')"
+export WATERMARK_SEAL_PYTHON="$(conda run -n ldwm-wind python -c 'import sys; print(sys.executable)')"
 export WATERMARK_T2SMARK_PYTHON="$(conda run -n ldwm-t2smark python -c 'import sys; print(sys.executable)')"
 ```
 
-Add these to your backend service's environment file when deploying. The website's Python environment and each method's Python environment are independent. Do not put SSH keys or Hugging Face tokens in tracked source files.
+Add these to your backend service's environment file when deploying. The website's Python environment is independent from these shared inference environments. Do not put SSH keys or Hugging Face tokens in tracked source files.
 
 | Method ID | Python executable variable | Optional source path override |
 | --- | --- | --- |
@@ -79,7 +94,7 @@ Add these to your backend service's environment file when deploying. The website
 | `tag-wm` | `WATERMARK_TAG_WM_PYTHON` | `WATERMARK_TAG_WM_REPO` |
 | `serum` | `WATERMARK_SERUM_PYTHON` | `WATERMARK_SERUM_REPO` |
 
-Each method also supports `WATERMARK_<METHOD>_MODEL_ID` with the same uppercase prefix, for example `WATERMARK_RING_ID_MODEL_ID`. Use the original SD 2.1 architecture/weights or a trusted local copy; changing to an unrelated model does not reproduce the method. T2SMark defaults to SD 2.1 (not the base variant), as in its repository. Model access/license acceptance and cache downloads must be arranged on the server. Offline model folders must contain the complete pipeline, including scheduler/tokenizer/VAE/UNet assets. SERUM instead takes its model and sampling settings from the saved SERUM YAML configuration; its generic MODEL_ID variable is not used.
+Each method also supports `WATERMARK_<METHOD>_MODEL_ID` with the same uppercase prefix, for example `WATERMARK_RING_ID_MODEL_ID`. The shared pipeline loader uses the `fp16` model revision by default; set `WATERMARK_<METHOD>_MODEL_REVISION` when the selected model repository uses a different ref (for example, `main`). Use the original SD 2.1 architecture/weights or a trusted local copy; changing to an unrelated model does not reproduce the method. T2SMark defaults to SD 2.1 (not the base variant), as in its repository. Model access/license acceptance and cache downloads must be arranged on the server. Offline model folders must contain the complete pipeline, including scheduler/tokenizer/VAE/UNet assets. SERUM instead takes its model and sampling settings from the saved SERUM YAML configuration; its generic MODEL_ID variable is not used.
 
 ## 3. Prepare method artifacts
 
