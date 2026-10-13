@@ -932,6 +932,18 @@ input[type='range'] {
   width: 100%;
 }
 
+.image-stage.has-image {
+  display: block;
+  height: auto;
+  min-height: 0;
+}
+
+.image-stage.has-image img {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+
 .latent-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1px),
