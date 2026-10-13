@@ -128,7 +128,7 @@ def extract(args, torch, Image, DDIMInverseScheduler, StableDiffusionPipeline, g
             "redundancy": redundancy,
             "num_elements": num_elements,
             "latent_shape": [1, 4, 64, 64],
-            "decoder": "majority vote",
+            "decoder": "majority vote" if coding == "gaussian" else "LDPC belief propagation with vote-and-retry fallback",
             "bit_error_rate": bit_error_rate,
         },
     }

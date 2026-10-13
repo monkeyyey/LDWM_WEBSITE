@@ -175,7 +175,10 @@ The wrapper currently uses upstream default shuffle/encryption seeds, FPR 1e-6, 
 
 ### SERUM
 
-Prepare the dataset and train the joint watermark/detector through its official commands:
+Prepare the dataset and train the detector for the saved watermark grid through
+the official commands. In the pinned source, `_prepare_optimizer` includes only
+`score_model.parameters()`; despite the grid being stored as an `nn.Parameter`,
+this training loop does not jointly optimize it:
 
 ```bash
 python -m src.data.dataset --config config.yaml --mode generate --batch-size 16

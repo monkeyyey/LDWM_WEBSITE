@@ -24,6 +24,7 @@ import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useSt
 import './App.css'
 import { categories, repositoryMethods, type CategoryId, type RepositoryMethodId, type WorkflowId } from './methodCatalog'
 import repositoryCatalog from '../../backend/config/repository_methods.json'
+import { repositorySubmethods, type WorkflowSpec, type SubmethodSpec, type ProcessSpec } from './repositoryDetails'
 
 type OptionSpec = { label: string; type: string; default: number; min?: number; max?: number; step?: number; choices?: number[] }
 type RepositorySpec = { variants: string[]; adapter_workflows: string[]; options: Record<string, OptionSpec>; repo_url: string; validation: string }
@@ -31,35 +32,6 @@ const repositorySpecs: Partial<Record<MethodId, RepositorySpec>> = repositoryCat
 
 type MethodId = 'sfwmark' | 'gaussian-shannon' | 'lawa' | 'gaussian-shading' | 'prc-watermark' | RepositoryMethodId
 type BackendWorkflow = 'detect' | 'generate'
-
-type WorkflowSpec = {
-  id: WorkflowId
-  label: string
-  description: string
-  backendWorkflow: BackendWorkflow | null
-  available: boolean
-  inputs: string[]
-  outputs: string[]
-  source: string
-  unavailableReason?: string
-}
-
-type SubmethodSpec = {
-  id: string
-  name: string
-  description: string
-  payload: string
-  defaultMessage: string
-  messageMode?: 'editable' | 'generated' | 'variant'
-  repoDefaults: string[]
-  workflows: WorkflowSpec[]
-}
-
-type ProcessSpec = {
-  workflow: WorkflowId
-  label: string
-  steps: string[]
-}
 
 type Method = {
   id: MethodId
@@ -177,20 +149,20 @@ type JobSummary = {
 }
 
 const sfwmarkWorkflow: WorkflowSpec[] = [
-  { id: 'generate', label: 'Generation', description: 'Sample Gaussian latent noise, insert the Fourier watermark, and generate the watermarked image.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', 'HSQR or HSTR', 'Seed'], outputs: ['Watermarked image', '2048-pattern bank', 'Ground-truth key index'], source: 'No source job required' },
-  { id: 'verify', label: 'Verification', description: 'Compare the inverted latent with the expected saved watermark pattern.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Compatible generation job'], outputs: ['Fourier verification distance'], source: 'Uses the saved pattern and key artifacts' },
+  { id: 'generate', label: 'Generation', description: 'Sample Gaussian latent noise, insert the Fourier watermark, and generate the watermarked image.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', 'HSQR or HSTR', 'Configured diffusion model'], outputs: ['Watermarked image', 'Saved 2048-pattern bank and ground-truth index'], source: 'The official CLI fixes the single-image seed to 42; the website seed is not forwarded. Clean companion images remain internal.' },
+  { id: 'verify', label: 'Verification', description: 'Compare the inverted latent with the expected saved watermark pattern.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Compatible generation job'], outputs: ['Fourier L1 verification distance'], source: 'Uses the saved pattern and key artifacts. The shared runner also computes candidate distances; verification displays the known-pattern distance, not a thresholded presence decision.' },
   { id: 'identify', label: 'Identification', description: 'Search the candidate pattern bank and return the closest predicted watermark index.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Compatible generation job'], outputs: ['Predicted pattern index', 'Correct/incorrect against stored key'], source: 'Searches the saved 2048-pattern bank' },
 ]
 
 const gaussianWorkflows: WorkflowSpec[] = [
   { id: 'generate', label: 'Generation', description: 'Encode a 256-bit message into a redundant latent representation before diffusion generation.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', '256-bit binary message', 'Seed'], outputs: ['Watermarked image', 'Coding metadata'], source: 'No source job required' },
-  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 256-bit message; the repository reports bit error rate.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Expected 256-bit message', 'Compatible generation job'], outputs: ['Recovered 256 bits', 'Bit error rate'], source: 'DDIM inversion plus Gaussian or LDPC decoding' },
+  { id: 'verify', label: 'Verification', description: 'Extract the 256-bit message and compare with the expected message.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Expected 256-bit message', 'Matching model and coding settings'], outputs: ['Recovered 256 bits', 'Bit accuracy and BER'], source: 'Gaussian coding uses sign recovery and majority voting after DDIM inversion. A linked job is optional for this variant; the runner uses inversion prompt "man", guidance 1 and 50 steps.' },
   { id: 'identify', label: 'Identification', description: 'The upstream Gaussian-Shannon repo has no candidate-key identification workflow.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'No candidate-key identification procedure is implemented.' },
 ]
 
 const lawaWorkflows: WorkflowSpec[] = [
-  { id: 'generate', label: 'Generation', description: 'Generate with the LaWa modified decoder and a pretrained 48-bit watermark.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', '48-bit binary message', 'Seed'], outputs: ['Watermarked image'], source: 'No source job required' },
-  { id: 'verify', label: 'Verification', description: 'Verify the generated image by extracting the 48-bit message; the repository reports bit accuracy and bit error rate.', backendWorkflow: 'detect', available: true, inputs: ['Watermarked image', 'Expected 48-bit message'], outputs: ['Recovered 48 bits', 'Bit accuracy', 'Bit error rate'], source: 'Pretrained LaWa decoder' },
+  { id: 'generate', label: 'Generation', description: 'Generate with a pretrained LaWa-modified VAE decoder and the supplied 48-bit message.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', '48-bit binary message', 'Seed', 'SD v1.4 and LaWa checkpoints'], outputs: ['Watermarked image'], source: 'Calls inference_AIGC.py. Only the watermarked image is exposed; clean/difference images and benchmark evaluations are not website results.' },
+  { id: 'verify', label: 'Verification', description: 'Extract the 48-bit message with the pretrained message extractor and compare with expected bits.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Expected 48-bit message', 'Matching LaWa extractor checkpoint'], outputs: ['Recovered 48 bits', 'Bit accuracy', 'Bit error rate'], source: 'Calls model.decoder, the separate MessageDecoder network, not the generative VAE decoder. No diffusion inversion or linked generation job is required.' },
   { id: 'identify', label: 'Identification', description: 'The upstream LaWa repo has no candidate-key identification workflow.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'LaWa decodes a message but does not search a candidate-key bank.' },
 ]
 
@@ -202,12 +174,39 @@ const gaussianShadingWorkflows: WorkflowSpec[] = [
 
 const prcWorkflows: WorkflowSpec[] = [
   { id: 'generate', label: 'Generation', description: 'Generate PRC encoding and decoding keys, encode a random keyed codeword, map it to pseudogaussian noise, and generate the image.', backendWorkflow: 'generate', available: true, inputs: ['Prompt', 'Target FPR', 'Parity-check sparsity t', 'Seed'], outputs: ['Watermarked image', 'Saved encoding and decoding keys'], source: 'The released encode.py calls Encode without a user message' },
-  { id: 'detect', label: 'Detect', description: 'Run exact inversion, recover a posterior vector, and apply the repository statistical Detect function with the key FPR.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Compatible decoding key', 'Posterior vector', 'Key false-positive rate'], outputs: ['Detect boolean', 'Threshold decision'], source: 'Calls src.prc.Detect(decoding_key, posteriors); it does not recover a user message' },
-  { id: 'decode', label: 'Decode', description: 'Run exact inversion, recover a posterior vector, and run belief propagation plus test-bit validation from the decoding key.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Compatible decoding key', 'Posterior vector', 'Maximum BP iterations'], outputs: ['Decode-valid boolean', 'Recovered message or None internally'], source: 'Calls src.prc.Decode(decoding_key, posteriors); the released generator supplies no user message, so the UI reports validity only' },
+  { id: 'detect', label: 'Detect', description: 'Run exact inversion, recover a posterior vector, and apply the repository statistical Detect function with the key FPR.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Compatible generation job with decoding key'], outputs: ['Statistical Detect boolean'], source: 'Computes posteriors internally and calls src.prc.Detect. FPR comes from the saved key; neither a posterior vector nor a separate FPR is supplied during analysis.' },
+  { id: 'decode', label: 'Decode', description: 'Run exact inversion, recover a posterior vector, and run belief propagation plus test-bit validation from the decoding key.', backendWorkflow: 'detect', available: true, inputs: ['Image', 'Compatible generation job with decoding key'], outputs: ['Decode-valid boolean'], source: 'Computes posteriors internally and calls src.prc.Decode using the BP limit stored in the key. The website generator supplies no user message, so the result reports validity only.' },
   { id: 'identify', label: 'Identification', description: 'The released repository does not search across account or key candidates.', backendWorkflow: null, available: false, inputs: [], outputs: [], source: 'Unavailable in the upstream repository', unavailableReason: 'PRC-Watermark provides keyed binary detection, not candidate-bank identification.' },
 ]
 
 const gaussianZeroMessage = '0'.repeat(256)
+
+function sfwProcesses(variant: 'HSQR' | 'HSTR'): ProcessSpec[] {
+  return [
+    { workflow: 'generate', label: 'Generation', steps: ['Build 2048-pattern bank', variant === 'HSQR' ? 'QR sign pattern, channel 3' : 'Hermitian rings + heterogeneous channel', 'Fourier insertion in 44 x 44 center', 'Stable Diffusion generation', 'Image + bank + expected index'] },
+    { workflow: 'verify', label: 'Verification', steps: ['Image + expected pattern', 'Empty-prompt DDIM inversion', variant === 'HSQR' ? 'QR-reference complex L1 distance' : 'Masked complex L1 distance', 'Known-pattern distance (no threshold)'] },
+    { workflow: 'identify', label: 'Identification', steps: ['Image + saved 2048-pattern bank', 'Empty-prompt DDIM inversion', variant === 'HSQR' ? 'QR candidate distance search' : 'Ring candidate distance search', 'Closest index + label correctness'] },
+  ]
+}
+
+function gaussianProcesses(ldpc: boolean): ProcessSpec[] {
+  return [
+    { workflow: 'generate', label: 'Generation', steps: ['Prompt + 256-bit message', ldpc ? 'LDPC encoding + 16 redundant copies' : '64 redundant copies', 'Pseudo-random flips + Gaussian mapping', 'DDIM generation', ldpc ? 'Image + saved H/G matrices' : 'Watermarked image'] },
+    { workflow: 'verify', label: 'Verification', steps: ['Image + expected message', 'VAE mean + DDIM inversion', 'Extract symbols + undo sign flips', ldpc ? 'LDPC BP; vote-and-retry fallback' : 'Majority vote across copies', 'Recovered 256 bits + BER'] },
+  ]
+}
+
+function shadingProcesses(chacha: boolean): ProcessSpec[] {
+  return [
+    { workflow: 'generate', label: 'Generation', steps: ['Random watermark bits', 'Repeat across channels and space', chacha ? 'ChaCha20 encryption' : 'XOR with random binary key', 'Truncated-Gaussian sampling', 'Diffusion generation + saved key'] },
+    { workflow: 'verify', label: 'Verification', steps: ['Image + linked key', 'Empty-prompt DDIM inversion', chacha ? 'ChaCha20 decryption' : 'XOR key recovery', 'Vote across redundant copies', 'Bit accuracy + BER', 'Detection + traceability thresholds'] },
+  ]
+}
+
+const ldpcWorkflows = gaussianWorkflows.map((flow): WorkflowSpec => flow.id === 'verify' ? {
+  ...flow, inputs: ['Image', 'Expected 256-bit message', 'Compatible generation job with H/G matrices'],
+  source: 'Tries LDPC belief propagation on each redundant copy; if all parity checks fail, votes across copies and retries BP. Saved H/G matrices are required. The runner uses inversion prompt "man", guidance 1 and 50 steps.',
+} : flow.id === 'generate' ? { ...flow, outputs: ['Watermarked image', 'Saved H/G coding matrices and metadata'] } : flow)
 
 const methods: Method[] = [
   {
@@ -220,14 +219,10 @@ const methods: Method[] = [
     mechanism: 'Embeds a keyed pattern into the Fourier space of Gaussian latent noise before Stable Diffusion generation.',
     bestFor: 'Pattern verification and identification from a generated image after DDIM inversion.',
     color: '#136f63',
-    processes: [
-      { workflow: 'generate', label: 'Generation', steps: ['Prompt', 'Gaussian latent noise, 1 x 4 x 64 x 64', 'Fourier watermark insertion', 'Stable Diffusion generation', 'Watermarked image'] },
-      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + saved pattern', 'DDIM inversion', 'Expected-pattern distance', 'Verification result'] },
-      { workflow: 'identify', label: 'Identification', steps: ['Watermarked image + 2048-pattern bank', 'DDIM inversion', 'Candidate distance search', 'Closest pattern index'] },
-    ],
+    processes: [],
     submethods: [
-      { id: 'hsqr', name: 'HSQR', description: 'Hermitian-symmetric QR-like Fourier pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSQR', messageMode: 'variant', repoDefaults: ['wm_type: HSQR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
-      { id: 'hstr', name: 'HSTR', description: 'Hermitian-symmetric tree-ring pattern placed in the selected latent frequency region.', payload: 'Keyed pattern index', defaultMessage: 'HSTR', messageMode: 'variant', repoDefaults: ['wm_type: HSTR', 'latent: 1 x 4 x 64 x 64', 'Fourier insertion: center slice'], workflows: sfwmarkWorkflow },
+      { id: 'hsqr', name: 'HSQR', description: 'Hermitian-symmetric QR sign pattern embedded through real/imaginary Fourier coefficients in the latent center.', payload: 'Pattern-bank index; no arbitrary text payload', defaultMessage: 'HSQR', messageMode: 'variant', repoDefaults: ['wm_type: HSQR', 'Channel: 3', 'Center: 44 x 44', 'Patterns: 2048', 'Seed: fixed 42', 'Steps: 50', 'Guidance: 7.5'], upstreamDefaults: 'src/utils.py defines QR version 1, box size 2, delta 0, channel 3 and watermark seed 7433. The official single-prompt CLI fixes seed 42 and produces a clean companion internally.', sourceUrl: 'https://github.com/thomas11809/SFWMark/blob/78666128b44614a0cc471993649e3132d5dddfcb/src/generate.py', workflows: sfwmarkWorkflow, processes: sfwProcesses('HSQR') },
+      { id: 'hstr', name: 'HSTR', description: 'Hermitian-symmetric tree rings plus a heterogeneous pattern, with center-aware Fourier insertion.', payload: 'Pattern-bank index; no arbitrary text payload', defaultMessage: 'HSTR', messageMode: 'variant', repoDefaults: ['wm_type: HSTR', 'Channels: 0 + 3', 'Center: 44 x 44', 'Patterns: 2048', 'Seed: fixed 42', 'Steps: 50', 'Guidance: 7.5'], upstreamDefaults: 'src/generate.py calls make_Fourier_treering_pattern with hs=True, center=True and heter=True. The 2048-pattern bank uses watermark seeds starting at 7433.', sourceUrl: 'https://github.com/thomas11809/SFWMark/blob/78666128b44614a0cc471993649e3132d5dddfcb/src/generate.py', workflows: sfwmarkWorkflow, processes: sfwProcesses('HSTR') },
     ],
   },
   {
@@ -240,13 +235,10 @@ const methods: Method[] = [
     mechanism: 'Treats generation and inversion as a noisy channel, using redundancy and coding to recover exact bits.',
     bestFor: 'Message verification and bit error measurement after inversion.',
     color: '#7a4f00',
-    processes: [
-      { workflow: 'generate', label: 'Generation', steps: ['Prompt + 256-bit message', 'Gaussian or LDPC coding', 'Latent mapping, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image'] },
-      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + expected message', 'DDIM inversion', 'Bit extraction + decoding', 'Recovered bits + BER'] },
-    ],
+    processes: [],
     submethods: [
-      { id: 'gaussian', name: 'Gaussian coding', description: 'Gaussian diffusion of the message with spatial redundancy and majority-vote decoding.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: Gaussian', 'message: 256 bits', 'redundancy: 64'], workflows: gaussianWorkflows },
-      { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting code with pseudo-random sign flips, redundancy, and a majority-vote fallback.', payload: '256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['encoder: LDPC', 'message: 256 bits', 'code rate: 0.25'], workflows: gaussianWorkflows },
+      { id: 'gaussian', name: 'Gaussian coding', description: 'Repeated message bits with pseudo-random sign flips and majority-vote recovery after inversion.', payload: 'User-supplied 256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['Message: 256 bits', 'Redundancy: 64', 'Scheduler: DDIM', 'Steps: 50', 'Guidance: 7.5'], upstreamDefaults: 'The repository exposes coding functions and experiment notebooks, not a single global CLI preset. This adapter selects 256 bits, 64 copies and DDIM sampling.', sourceUrl: 'https://github.com/Rambo-Yi/Gaussian-Shannon/blob/ad89a75bc92001777637c6cc242a31188934e082/ldpc.py', workflows: gaussianWorkflows, processes: gaussianProcesses(false) },
+      { id: 'ldpc', name: 'LDPC coding', description: 'LDPC error-correcting coding with redundant copies, pseudo-random sign flips and belief-propagation decoding; voting is followed by another BP attempt when all copies fail.', payload: 'User-supplied 256-bit message', defaultMessage: gaussianZeroMessage, repoDefaults: ['Message: 256 bits', 'Code rate: 0.25', 'Redundancy: 16', 'BP iterations: 100', 'SNR: 0', 'Steps: 50'], upstreamDefaults: 'ldpc_decode tries each copy with BP and parity checks. table_decision=True enables vote-and-retry on failure. The adapter saves the generated H/G matrices; it does not regenerate them during verification.', sourceUrl: 'https://github.com/Rambo-Yi/Gaussian-Shannon/blob/ad89a75bc92001777637c6cc242a31188934e082/ldpc.py', workflows: ldpcWorkflows, processes: gaussianProcesses(true) },
     ],
   },
   {
@@ -256,15 +248,15 @@ const methods: Method[] = [
     categoryId: 'vae-decoder',
     status: 'integrated',
     category: 'VAE decoder watermark',
-    mechanism: 'Uses a modified Stable Diffusion VAE decoder to carry a pretrained binary watermark during generation.',
-    bestFor: '48-bit message verification with the pretrained decoder.',
+    mechanism: 'Uses a pretrained modified VAE decoder to embed supplied bits during generation, and a separate message extractor for verification.',
+    bestFor: '48-bit message extraction without diffusion inversion.',
     color: '#315f9f',
     processes: [
       { workflow: 'generate', label: 'Generation', steps: ['Prompt + 48-bit message', 'Stable Diffusion sampling', 'LaWa modified VAE decoder', 'Watermarked image'] },
       { workflow: 'verify', label: 'Verification', steps: ['Watermarked image', 'Pretrained message decoder', 'Recovered 48 bits + BER'] },
     ],
     submethods: [
-      { id: 'lawa-48', name: 'LaWa 48-bit', description: 'The repository exposes one pretrained LaWa configuration with a 48-bit message and SD v1.4.', payload: '48-bit message', defaultMessage: '110111001110110001000000011101000110011100110101', repoDefaults: ['config: SD14_LaWa_inference.yaml', 'message_len: 48', 'checkpoint: sd-v1-4.ckpt'], workflows: lawaWorkflows },
+      { id: 'lawa-48', name: 'LaWa 48-bit', description: 'This website uses the released SD v1.4 configuration with a configurable 48-bit message.', payload: 'User-supplied 48-bit message', defaultMessage: '110111001110110001000000011101000110011100110101', repoDefaults: ['Config: SD14_LaWa_inference.yaml', 'Message: 48 bits', 'Steps: 50', 'Image: 512 x 512', 'SD checkpoint: weights/stable-diffusion-v1/model.ckpt'], upstreamDefaults: 'The released inference configuration pairs the KL-f8 modified decoder with a separate MessageDecoder and weights/LaWa/last.ckpt. Model paths may be overridden on the server.', sourceUrl: 'https://github.com/vbdi/LaWa/blob/251ac11aa223e6ff12553364a65a75add5b1aecf/configs/SD14_LaWa_inference.yaml', workflows: lawaWorkflows },
     ],
   },
   {
@@ -277,13 +269,10 @@ const methods: Method[] = [
     mechanism: 'Diffuses a repository-generated bit watermark, randomizes it with XOR or ChaCha20, and samples each latent value from the matching half of a Gaussian distribution.',
     bestFor: 'Training-free keyed watermark verification with FPR-derived detection and traceability thresholds.',
     color: '#9a3f58',
-    processes: [
-      { workflow: 'generate', label: 'Generation', steps: ['Prompt + generated watermark', 'Diffuse + randomize bits', 'Truncated-Gaussian latent sampling', 'Diffusion generation', 'Watermarked image'] },
-      { workflow: 'verify', label: 'Verification', steps: ['Watermarked image + saved key', 'Empty-prompt DDIM inversion', 'Decrypt + redundancy vote', 'Bit accuracy + BER', 'Detection + traceability thresholds'] },
-    ],
+    processes: [],
     submethods: [
-      { id: 'chacha', name: 'ChaCha20', description: 'The strict distribution-preserving variant encrypts diffused watermark bits with a random ChaCha20 key and nonce.', payload: 'Repository-generated bit watermark', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'capacity: 256 bits', 'FPR: 1e-6', 'users: 1,000,000'], workflows: gaussianShadingWorkflows },
-      { id: 'simple', name: 'Simple XOR', description: 'The faster baseline randomizes diffused bits with a random binary key; the upstream README says it is not strictly performance-lossless.', payload: 'Repository-generated bit watermark', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'capacity: 256 bits', 'randomization: XOR'], workflows: gaussianShadingWorkflows },
+      { id: 'chacha', name: 'ChaCha20', description: 'The distribution-preserving construction encrypts repeated watermark bits with a random ChaCha20 key and nonce.', payload: 'Generated bits; capacity depends on copy factors', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'Capacity: 256 bits', 'FPR: 1e-6', 'Users: 1,000,000', 'Steps: 50', 'Guidance: 7.5'], upstreamDefaults: 'run_gaussian_shading.py uses channel_copy=1, hw_copy=8, FPR=1e-6 and 1,000,000 users. ChaCha20 is enabled with --chacha; the website selects it by default. Capacity is 16384 / (channel_copy * hw_copy^2).', sourceUrl: 'https://github.com/bsmhmmlf/Gaussian-Shading/blob/09c678fadc7545acf7be12647ddf2a5e66f6a9dc/run_gaussian_shading.py', workflows: gaussianShadingWorkflows, processes: shadingProcesses(true) },
+      { id: 'simple', name: 'Simple XOR', description: 'Randomizes repeated bits with a random binary XOR key; the upstream README does not claim strict performance-losslessness for this variant.', payload: 'Generated bits; capacity depends on copy factors', defaultMessage: 'Generated by Gaussian Shading', messageMode: 'generated', repoDefaults: ['channel_copy: 1', 'hw_copy: 8', 'Capacity: 256 bits', 'FPR: 1e-6', 'Users: 1,000,000', 'Steps: 50', 'Guidance: 7.5'], upstreamDefaults: 'The upstream CLI uses Simple XOR when --chacha is absent. Copy factors and FPR settings match the ChaCha path, but the README qualifies the distribution guarantee for this faster baseline.', sourceUrl: 'https://github.com/bsmhmmlf/Gaussian-Shading/blob/09c678fadc7545acf7be12647ddf2a5e66f6a9dc/README.md', workflows: gaussianShadingWorkflows, processes: shadingProcesses(false) },
     ],
   },
   {
@@ -294,7 +283,7 @@ const methods: Method[] = [
     status: 'integrated',
     category: 'Pseudorandom-code latent watermark',
     mechanism: 'Encodes a keyed pseudorandom codeword, maps its signs to pseudogaussian initial noise, and applies Detect or Decode after exact diffusion inversion.',
-    bestFor: 'Undetectable keyed binary detection and decode-validity testing at a target false-positive rate.',
+    bestFor: 'Keyed statistical detection and decode-validity testing at a target false-positive rate.',
     color: '#34766f',
     processes: [
       { workflow: 'generate', label: 'Generation', steps: ['Prompt + PRC key generation', 'Random keyed codeword', 'Pseudogaussian latent, 1 x 4 x 64 x 64', 'Diffusion generation', 'Watermarked image'] },
@@ -302,7 +291,7 @@ const methods: Method[] = [
       { workflow: 'decode', label: 'Decode', steps: ['Watermarked image + decoding key', 'Exact inversion', 'Posterior vector', 'Belief propagation + validity'] },
     ],
     submethods: [
-      { id: 'prc', name: 'PRC', description: 'The released implementation uses one PRC path with a 16,384-symbol codeword. Detect and Decode are separate operations; the original decode.py runs both and reports an optional OR combination.', payload: 'Keyed binary presence decision', defaultMessage: 'Generated keyed PRC codeword', messageMode: 'generated', repoDefaults: ['codeword: 16,384 symbols', 'FPR: 1e-5', 'parity sparsity t: 3', 'posterior variance: 1.5'], workflows: prcWorkflows },
+      { id: 'prc', name: 'PRC', description: 'The released implementation uses a 16,384-symbol PRC codeword. Detect and Decode are separate operations; the upstream decode.py also reports their OR combination.', payload: 'Random keyed PRC codeword; no user message', defaultMessage: 'Generated keyed PRC codeword', messageMode: 'generated', repoDefaults: ['Codeword: 16,384 symbols', 'FPR: 1e-5', 'Parity sparsity t: 3', 'Posterior variance: 1.5', 'Inversion order: 0', 'Steps: 50'], upstreamDefaults: 'encode.py uses KeyGen then Encode without a user message. decode.py calls both Detect and Decode; the website exposes them independently and does not return their OR as the selected action.', sourceUrl: 'https://github.com/XuandongZhao/PRC-Watermark/blob/3f372c1d9cafcd0732331c0d00f0430ee822a389/decode.py', workflows: prcWorkflows },
     ],
   },
   ...repositoryMethods.map((method): Method => ({
@@ -310,26 +299,8 @@ const methods: Method[] = [
     status: 'experimental',
     bestFor: method.payload,
     color: categories.find((category) => category.id === method.categoryId)!.color,
-    submethods: repositorySpecs[method.id]!.variants.map((variant) => ({
-      id: variant,
-      name: `${method.name} / ${variant}`,
-      description: method.mechanism,
-      payload: method.payload,
-      defaultMessage: method.payload,
-      messageMode: 'generated',
-      repoDefaults: ['512 x 512', 'NVIDIA CUDA', 'Pinned upstream checkout', 'Awaiting GPU validation'],
-      workflows: [...method.processes].sort((a, b) => Number(b.workflow === 'generate') - Number(a.workflow === 'generate')).map((process) => ({
-        id: process.workflow,
-        label: process.label,
-        description: process.steps.join(' -> '),
-        backendWorkflow: process.workflow === 'generate' ? 'generate' : 'detect',
-        available: repositorySpecs[method.id]!.adapter_workflows.includes(process.workflow),
-        unavailableReason: 'Offline preparation required; see the repository setup guide.',
-        inputs: [process.steps[0]],
-        outputs: [process.steps[process.steps.length - 1]],
-        source: 'Pinned upstream functions. Analysis reuses the model, parameters and artifacts saved with the generation job. CUDA validation pending.',
-      })),
-    })),
+    processes: [],
+    submethods: repositorySubmethods(method.id, method.name),
   })),
 ]
 
@@ -386,7 +357,7 @@ function App() {
   const isPrcAnalysis = selectedMethod.id === 'prc-watermark' && (selectedWorkflow.id === 'detect' || selectedWorkflow.id === 'decode')
   const isPrcDetect = selectedWorkflow.id === 'detect'
   const usesGeneratedPayload = selectedSubmethod.messageMode === 'generated'
-  const requiresSourceKey = Boolean(repositorySpec) || ['sfwmark', 'gaussian-shading', 'prc-watermark'].includes(selectedMethod.id)
+  const requiresSourceKey = Boolean(repositorySpec) || ['sfwmark', 'gaussian-shading', 'prc-watermark'].includes(selectedMethod.id) || (selectedMethod.id === 'gaussian-shannon' && selectedSubmethod.id === 'ldpc')
   const messageLockedToJob = usesGeneratedPayload || (!isGeneration && selectedMethod.id !== 'sfwmark' && Boolean(sourceJobId))
   const messageFieldLabel = repositorySpec ? 'Repository-generated watermark' : selectedMethod.id === 'sfwmark'
     ? 'Watermark variant'
@@ -501,7 +472,7 @@ function App() {
           analysisMode: workflow,
           prompt,
           message,
-          seed,
+          seed: selectedMethod.id === 'sfwmark' ? 42 : seed,
           imageName: uploadName === 'No image selected' ? null : uploadName,
           imageDataUrl: uploadedImage,
           sourceJobId,
@@ -668,14 +639,14 @@ function App() {
             {isGeneration ? <label className="field"><span>Prompt</span><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} /></label> : null}
             {needsImage ? <>
               <label className="upload-zone primary-upload"><input accept="image/*" onChange={handleUpload} type="file" /><ImageUp size={20} /><span>{uploadName}</span></label>
-              <div className={`source-job-note ${sourceJobId ? 'linked' : ''}`}><strong>{sourceJobId ? `Linked generation job: ${sourceJobId}` : 'No generation job linked'}</strong><span>{isSfwAnalysis ? 'SFWMark analysis uses the saved pattern bank and key associated with a generated job.' : requiresSourceKey ? `${selectedMethod.name} analysis uses the private key and parameters saved with a compatible generation job.` : 'Upload a generated or edited image for repository extraction/evaluation.'}</span></div>
+              <div className={`source-job-note ${sourceJobId ? 'linked' : ''}`}><strong>{sourceJobId ? `Linked generation job: ${sourceJobId}` : 'No generation job linked'}</strong><span>{isSfwAnalysis ? 'SFWMark analysis uses the saved pattern bank and key associated with a generated job.' : requiresSourceKey ? `${selectedMethod.name} analysis requires the state and configuration saved with a compatible generation job.` : 'A linked job is optional; analysis requires matching model and message settings.'}</span></div>
               <label className="field previous-job-field"><span>Choose previous generated job</span><select value={selectedJobId} onChange={(event) => selectPreviousJob(event.target.value)}><option value="">Select a saved {selectedSubmethod.name} job</option>{jobs.map((job) => <option key={job.job_id} value={job.job_id}>{job.label} · {job.prompt || job.job_id}</option>)}</select></label>
               {sourceJobId && uploadedImage ? <div className="previous-job-preview"><img src={uploadedImage} alt="Selected watermarked output" /><div><strong>{jobs.find((job) => job.job_id === sourceJobId)?.label ?? `Job ${sourceJobId}`}</strong><span>{jobs.find((job) => job.job_id === sourceJobId)?.prompt ?? 'Selected watermarked image'}</span></div></div> : null}
             </> : null}
 
             <div className="field-row">
               <label className={`field ${selectedMethod.id === 'gaussian-shannon' && selectedSubmethod.messageMode !== 'variant' ? 'message-field' : ''}`}><span>{messageFieldLabel}</span>{selectedSubmethod.messageMode === 'variant' ? <select value={selectedSubmethod.id} onChange={(event) => selectSubmethod(event.target.value)} disabled={!isGeneration}>{selectedMethod.submethods.map((submethod) => <option key={submethod.id} value={submethod.id}>{submethod.name}</option>)}</select> : selectedMethod.id === 'gaussian-shannon' ? <textarea className="message-textarea" rows={6} value={message} onChange={(event) => setMessage(event.target.value.replace(/\s/g, ''))} disabled={messageLockedToJob} readOnly={messageLockedToJob} spellCheck={false} /> : <input value={message} onChange={(event) => setMessage(event.target.value)} disabled={messageLockedToJob} readOnly={messageLockedToJob} />}</label>
-              <label className="field small-field"><span>Seed</span><input value={seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration} /></label>
+              <label className="field small-field"><span>{selectedMethod.id === 'sfwmark' ? 'Seed (fixed upstream)' : 'Seed'}</span><input value={selectedMethod.id === 'sfwmark' ? 42 : seed} onChange={(event) => setSeed(Number(event.target.value))} type="number" disabled={!isGeneration || selectedMethod.id === 'sfwmark'} /></label>
             </div>
 
             {isGeneration && selectedMethod.id === 'gaussian-shading' ? <div className="option-grid" aria-label="Gaussian Shading repository options">
@@ -709,13 +680,14 @@ function App() {
           <section className="implementation-panel" aria-label={`${selectedMethod.name} explanation`} style={{ '--method-color': selectedMethod.color } as CSSProperties}>
             <div className="implementation-summary">
               <div><span>{isPlanned ? 'Planned method' : 'Selected implementation'}</span><strong>{selectedSubmethod.name}</strong><p>{isPlanned ? selectedMethod.category : selectedSubmethod.description}</p></div>
-              <div><span>{isPlanned ? 'Expected watermark' : 'Payload and backend behavior'}</span><strong>{selectedSubmethod.payload}</strong><p>{selectedMethod.mechanism}</p></div>
+              <div><span>{isPlanned ? 'Expected watermark' : 'Payload and backend behavior'}</span><strong>{selectedSubmethod.payload}</strong><p>{selectedSubmethod.backendBehavior ?? selectedMethod.mechanism}</p></div>
             </div>
             <div className="workflow-contract" aria-label={`${selectedWorkflow.label} inputs and outputs`}><div><span>Needs</span><ul>{selectedWorkflow.inputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Returns</span><ul>{selectedWorkflow.outputs.map((item) => <li key={item}>{item}</li>)}</ul></div><div><span>Repository context</span><p>{selectedWorkflow.source}</p></div></div>
-            {!isPlanned && <div className="repo-defaults" aria-label="Repository defaults"><strong>Repository defaults</strong>{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>}
+            {!isPlanned && <div className="repo-defaults" aria-label="Website defaults"><strong>Website defaults</strong>{selectedSubmethod.repoDefaults.map((item) => <span key={item}>{item}</span>)}</div>}
+            {selectedSubmethod.upstreamDefaults && <div className="upstream-reference"><strong>Upstream reference</strong><p>{selectedSubmethod.upstreamDefaults}</p>{selectedSubmethod.sourceUrl && <a href={selectedSubmethod.sourceUrl} target="_blank" rel="noreferrer">Reviewed repository source</a>}</div>}
             <div className="process-map">
-              <div className="process-map-heading"><span>{isPlanned ? 'Planned processes' : 'Repository processes'}</span><p>{isPlanned ? 'Repository integration pending' : selectedWorkflow.label}</p></div>
-              <div className="process-rows">{selectedMethod.processes.map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><span>Process</span><strong>{process.label}</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
+              <div className="process-map-heading"><span>{isPlanned ? 'Planned processes' : 'Implementation processes'}</span><p>{isPlanned ? 'Repository integration pending' : selectedSubmethod.name}</p></div>
+              <div className="process-rows">{(selectedSubmethod.processes ?? selectedMethod.processes).map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><span>{selectedSubmethod.workflows.find((flow) => flow.id === process.workflow)?.available ? 'Website' : 'Offline upstream'}</span><strong>{process.label}</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
             </div>
           </section>
 

@@ -39,12 +39,14 @@ Repository: `work/repos/LaWa`
 
 - Generation calls the original `inference_AIGC.py` with the pretrained 48-bit
   message configuration.
-- Verification uses the modified decoder to extract 48 bits and reports bit
+- Verification uses the separate pretrained message extractor to recover 48 bits and reports bit
   accuracy and bit error rate.
 - The repository has no candidate-bank identification procedure.
 
 The extraction runner loads the same LaWa model and calls its `model.decoder`
-path. It does not claim arbitrary-image watermark embedding.
+path, which is a `MessageDecoder`, not the generative VAE decoder. The 48-bit
+message is user-supplied; the network weights, not the message, are pretrained.
+It does not claim arbitrary-image watermark embedding.
 
 ## Gaussian Shading
 
@@ -104,4 +106,5 @@ The nine new adapters call pinned upstream generation/analysis functions. They a
 
 Key distinctions: Ring-ID exposes known-key verification separately from identification; WIND full retains its search fallback; T2SMark decodes using the recovered session key; SEAL performs two generation passes; ROBIN verifies an intermediate state; TAG-WM exports an independent tamper mask; SERUM VAE-encodes before scoring without diffusion inversion. None of the continuous scores is relabeled as a calibrated detection probability/decision.
 
-The original five-method notes below remain applicable to those adapters.
+The complete source-level UI/adapter audit, including all 14 methods and
+variant-specific differences, is recorded in [METHOD_UI_AUDIT.md](../docs/METHOD_UI_AUDIT.md).
