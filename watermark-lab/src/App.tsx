@@ -9,6 +9,7 @@ import {
   CircleAlert,
   Copy,
   Download,
+  ExternalLink,
   Gauge,
   ImageUp,
   KeyRound,
@@ -619,7 +620,7 @@ function App() {
 
       <section className="workspace">
         <header className="topbar">
-          <div><p className="eyebrow">Watermark methods</p><h2>Watermark catalogue</h2></div>
+          <h2>Watermark Method Catalogue</h2>
           <span className="catalogue-total">{categories.length} categories · {methods.length} methods</span>
         </header>
 
@@ -631,8 +632,7 @@ function App() {
                 const CategoryIcon = [Waves, Aperture, Layers, SlidersHorizontal, Activity][index]
                 return <button ref={(node) => { categoryButtonRefs.current[category.id] = node }} className="category-button" key={category.id} onClick={() => changeSelectorView('methods', category.id)} style={{ '--category-color': category.color } as CSSProperties} type="button">
                   <span className="category-icon"><CategoryIcon aria-hidden="true" size={20} /></span>
-                  <span className="category-copy"><strong>{category.name}</strong><small>{category.detail}</small></span>
-                  <span className="category-count" aria-label={`${count} ${count === 1 ? 'method' : 'methods'}`}>{count}</span>
+                  <span className="category-copy"><strong>{category.name} <span className="category-count">({count} {count === 1 ? 'Method' : 'Methods'})</span></strong><small>{category.detail}</small></span>
                 </button>
               })}
             </nav>
@@ -646,14 +646,16 @@ function App() {
         </div>
 
         <section className="method-navigation" aria-label={`${selectedMethod.name} submethods and workflows`}>
-          <div className="navigation-group"><div className="navigation-label"><span>Submethod</span><strong>{selectedMethod.name}</strong></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button aria-pressed={submethod.id === selectedSubmethod.id} className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>
-          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span><strong>{selectedWorkflow.label}</strong></div><div><div className="workflow-tabs">{selectedSubmethod.workflows.filter((workflow) => workflow.available).map((workflow) => <button aria-pressed={workflow.id === selectedWorkflow.id} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : workflow.unavailableReason ?? `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div></div></div>
+          <div className="navigation-group"><div className="navigation-label"><span>Submethod</span></div><div className="submethod-tabs">{selectedMethod.submethods.map((submethod) => <button aria-pressed={submethod.id === selectedSubmethod.id} className={submethod.id === selectedSubmethod.id ? 'active' : ''} key={submethod.id} onClick={() => selectSubmethod(submethod.id)} type="button">{submethod.name}</button>)}</div></div>
+          <div className="navigation-group"><div className="navigation-label"><span>Repository action</span></div><div className="workflow-tabs">{selectedSubmethod.workflows.filter((workflow) => workflow.available).map((workflow) => <button aria-pressed={workflow.id === selectedWorkflow.id} className={`${workflow.id === selectedWorkflow.id ? 'active' : ''} ${workflow.available ? '' : 'disabled'}`} disabled={!workflow.available} key={workflow.id} onClick={() => selectWorkflow(workflow.id)} title={workflow.available ? workflow.label : workflow.unavailableReason ?? `${workflow.label} is not implemented by this repository`} type="button">{workflow.id === 'generate' ? <Sparkles size={15} /> : workflow.id === 'identify' ? <Search size={15} /> : <ShieldCheck size={15} />}{workflow.label}</button>)}</div></div>
         </section>
 
         <section className="main-grid">
           <div className="control-panel">
-            <div className="section-heading"><SlidersHorizontal size={18} /><div><h3>{selectedWorkflow.label}</h3><p className="heading-description">{selectedWorkflow.description}</p></div></div>
-            {repositorySpec && <div className="repository-validation"><a href={repositorySpec.repo_url} target="_blank" rel="noreferrer">Official repository <ArrowRight aria-hidden="true" size={14} /></a></div>}
+            <div className="control-heading-row"><div className="control-title"><SlidersHorizontal size={18} /><h3>{selectedWorkflow.label}</h3></div>
+              {repositorySpec && <a className="repository-link" href={repositorySpec.repo_url} target="_blank" rel="noreferrer">Official repository <ExternalLink aria-hidden="true" size={17} /></a>}
+              <p className="heading-description control-description">{selectedWorkflow.description}</p>
+            </div>
 
             {isGeneration ? <label className="field"><span>Prompt</span><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} /></label> : null}
             {needsImage ? <>
@@ -707,7 +709,7 @@ function App() {
             </details>
             <div className="process-map">
               <div className="process-map-heading"><span>Process</span><p>{selectedSubmethod.name}</p></div>
-              <div className="process-rows">{(selectedSubmethod.processes ?? selectedMethod.processes).map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><span>{selectedSubmethod.workflows.find((flow) => flow.id === process.workflow)?.available ? 'Website' : 'Offline upstream'}</span><strong>{process.label}</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
+              <div className="process-rows">{(selectedSubmethod.processes ?? selectedMethod.processes).map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><strong>{process.label} Flow</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
             </div>
           </section>
 

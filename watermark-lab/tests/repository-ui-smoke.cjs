@@ -57,9 +57,12 @@ const variantGraphText = {
       return route.fulfill({ json: { result: { job_id: 'abcdef123456', status: 'completed', workflow: 'detect', detection_score: 0, recovered_payload: '0101', runtime: 'real', image_url: null, raw: { summary: 'Native statistic; calibration required.', metrics: [{ label: 'Native score', value: .125 }, { label: 'Candidate count', value: 16 }], ...(request.method === 'tag-wm' ? { mask_url: '/files/ui-mask.png' } : {}) } } } });
     });
     await page.goto(process.env.UI_URL || 'http://127.0.0.1:5173');
+    assert.equal(await page.getByRole('heading', { name: 'Watermark Method Catalogue' }).count(), 1);
+    assert.equal(await page.getByText('WATERMARK METHODS', { exact: true }).count(), 0);
+    assert.equal(await page.locator('.category-button').filter({ hasText: 'Latent / Initial Noise (8 Methods)' }).count(), 1);
     const selectCategory = async name => {
       if (await page.locator('.selector-stage.is-active .category-back').count()) await page.getByRole('button', { name: 'Back to categories' }).click();
-      await page.locator('.category-button').filter({ has: page.locator('strong').getByText(name, { exact: true }) }).click();
+      await page.locator('.category-button').filter({ hasText: name }).click();
       await page.locator('.method-grid').waitFor();
       assert.equal(await page.locator('.selector-stage[aria-hidden="true"] .category-grid').count(), 1);
       assert.equal(await page.locator('.selector-stage.is-active').count(), 1);
@@ -90,9 +93,10 @@ const variantGraphText = {
             for (const option of Object.values(catalog[id].options)) assert.ok(defaults.includes(`${option.label}: ${option.default}`), `${id} default drift: ${option.label}`);
             for (const row of await panel.locator('.process-row').all()) {
               const label = await row.locator('.process-label strong').textContent();
-              assert.ok(!label.includes('training') && label !== 'Optimization');
-              assert.equal(await row.locator('.process-label span').textContent(), 'Website');
+              assert.ok(label.endsWith(' Flow') && !label.includes('training') && !label.includes('Optimization'));
+              assert.equal(await row.locator('.process-label span').count(), 0);
             }
+            assert.equal(await page.locator('.control-heading-row .repository-link').count(), 1);
           }
           if (id === 'sfwmark') {
             assert.equal(await page.getByLabel('Seed (fixed upstream)').isDisabled(), true);
@@ -184,7 +188,7 @@ const variantGraphText = {
     await selectMethod('TAG-WM');
     await page.screenshot({ path: '/tmp/ldwm-repositories-mobile.png', fullPage: true });
     assert.deepEqual(errors, []);
-    console.log(`PASS: 14 methods / 21 variants, every action, source links, catalog defaults, variant graphs, LDPC state requirement, fixed SFW seed, edited-image linkage, metrics, mask, setup error, reduced motion, focus restoration and 320-1440px layouts. ${requests.length} mocked requests.`);
+    console.log(`PASS: 14 methods / 21 variants, every action, source links, catalog defaults, flow labels, variant graphs, LDPC state requirement, fixed SFW seed, edited-image linkage, metrics, mask, setup error, reduced motion, focus restoration and 320-1440px layouts. ${requests.length} mocked requests.`);
   } finally {
     await browser.close();
   }
