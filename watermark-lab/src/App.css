@@ -802,6 +802,7 @@ textarea:focus {
 }
 
 .workflow-chain .workflow-step {
+  align-items: center;
   background: transparent;
   border: 0;
   color: #343430;
