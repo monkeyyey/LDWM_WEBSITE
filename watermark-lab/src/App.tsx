@@ -708,7 +708,7 @@ function App() {
             {selectedSubmethod.upstreamDefaults && <div className="upstream-reference"><strong>Upstream reference</strong><p>{selectedSubmethod.upstreamDefaults}</p>{selectedSubmethod.sourceUrl && <a href={selectedSubmethod.sourceUrl} target="_blank" rel="noreferrer">Reviewed repository source</a>}</div>}
             </details>
             <div className="process-map">
-              <div className="process-map-heading"><span>Process</span><p>{selectedSubmethod.name}</p></div>
+              <div className="process-map-heading"><h3>{selectedSubmethod.name} Processes</h3></div>
               <div className="process-rows">{(selectedSubmethod.processes ?? selectedMethod.processes).map((process) => <div aria-current={process.workflow === selectedWorkflow.id ? 'step' : undefined} className={`process-row ${process.workflow === selectedWorkflow.id ? 'selected' : ''}`} key={process.workflow}><div className="process-label"><strong>{process.label} Flow</strong></div><div className="workflow-chain" aria-label={`${selectedMethod.name} ${process.label} flow`}>{process.steps.map((step, index, steps) => <div className="workflow-item" key={step}><span className="workflow-step">{step}</span>{index < steps.length - 1 ? <ArrowRight className="workflow-arrow" aria-hidden="true" size={16} /> : null}</div>)}</div></div>)}</div>
             </div>
           </section>

@@ -746,17 +746,18 @@ textarea:focus {
 }
 
 .process-map-heading {
-  align-items: baseline;
+  align-items: center;
   display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  padding: 12px 14px 9px;
+  justify-content: center;
+  padding: 16px 14px;
+  text-align: center;
 }
 
-.process-map-heading p {
-  font-size: 12px;
+.process-map-heading h3 {
+  font-size: 21px;
+  line-height: 1.3;
   margin: 0;
-  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .process-rows {
@@ -1357,14 +1358,9 @@ input[type='range'] {
     height: 320px;
   }
 
-  .process-map-heading,
   .form-actions {
     align-items: stretch;
     flex-direction: row;
-  }
-
-  .process-map-heading p {
-    text-align: left;
   }
 
   .form-actions .primary-button,
