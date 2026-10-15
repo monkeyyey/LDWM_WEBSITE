@@ -6,7 +6,7 @@ and the boundary between website inference and upstream research workflows.
 
 This is a source-level comparison of official Git checkouts with the local
 adapters, not a claim that every model has passed GPU inference or reproduced
-paper metrics. The nine experimental integrations enforce their pinned source
+paper metrics. The nine repository integrations enforce their pinned source
 revisions. The original five use configured checkouts; the links below record
 the revisions reviewed, not a new pin enforced by those adapters.
 
@@ -81,8 +81,9 @@ Important differences that must not be described as identical upstream defaults:
 
 - Explicit per-variant contracts replace first/last-graph-box-derived Needs and
   Returns. Graphs now change with the variant, and every workflow has its own row.
-- Train/Optimize rows are labeled **Offline upstream**, have no backend action,
-  and remain disabled in workflow selection.
+- Training and optimization are offline preparation, not website actions.
+  Their disabled tabs and process rows have been removed; setup requirements
+  remain in the method reference and setup guide.
 - Linked-state language no longer calls every artifact a private key: SEAL
   stores configuration; SERUM stores its detector/configuration; LDPC needs H/G.
 - LDPC verification is blocked in the UI until a generation job is linked,
@@ -92,6 +93,33 @@ Important differences that must not be described as identical upstream defaults:
   wording and SERUM joint-optimization wording, including setup documentation.
 
 ## Validation Boundary
+
+### Final UI Pass (2026-10-15)
+
+Rechecked the original five source checkouts and the nine pinned upstream
+revisions against the website adapters. The review preserves important limits:
+Fourier distances are not probabilities; an index is not an account identity;
+TAG-WM's mask is a prediction, not measured localization accuracy; SERUM's CNN
+score has no calibrated website threshold. SERUM mixes normalized grid and
+noise with square-root weights: `sqrt(1-alpha) * noise + sqrt(alpha) * grid_norm`.
+Its released optimizer updates the detector, not the grid.
+
+The main screen now contains runnable workflows, a separate row per process,
+plain-text generated payload summaries and expandable source/default details.
+Method categories crossfade without a timer-driven unmount. Inactive panes are
+inert, keyboard focus is restored, and reduced-motion preferences are respected.
+The analysis preview retains the complete image at its natural aspect ratio.
+
+Fixed an analysis input bug: uploading an edited image no longer discards the
+linked job's key/settings. Linking a job after uploading preserves the upload;
+clearing the job selection clears its key. Failure results use an error icon,
+and bit-accuracy results are no longer labeled as a generic verification score.
+
+Validation completed: production build and lint pass; all 20 backend CPU tests
+pass. The browser suite covers 14 methods / 21 variants and all exposed actions
+using 52 mocked requests, plus source links, defaults, variant graphs, edited
+image linkage in both selection orders, mask output, setup errors, keyboard
+focus, reduced motion and 320-1440px responsive layouts.
 
 Frontend build/lint, mocked browser contract tests and backend CPU contract tests
 check UI wiring, defaults, variant-specific graphs, result labels, source-job

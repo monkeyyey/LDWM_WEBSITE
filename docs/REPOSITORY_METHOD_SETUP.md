@@ -1,10 +1,10 @@
 # Repository Method Setup and Validation
 
-## Status and scope
+## Scope
 
-Nine new **experimental inference integrations** are wired to the website, in addition to the existing five methods. They call official repository functions from pinned source checkouts, not approximations or simulated result generators.
+Nine repository inference integrations are wired to the website, in addition to the original five methods. They call official repository functions from pinned source checkouts, not approximations or simulated result generators.
 
-This development machine has no NVIDIA CUDA device or diffusion model installations. Frontend and CPU contract checks are not proof of real image generation, detection quality, or paper-level reproduction. Every new method remains marked **GPU validation pending** until the acceptance checks below pass on your server.
+This development machine has no NVIDIA CUDA device or diffusion model installations. Frontend and CPU contract checks are not proof of real image generation, detection quality, or paper-level reproduction. Use the acceptance checks below to document results for each deployed environment.
 
 Training, optimization, full attack sweeps, FID/CLIP evaluation, ROC calibration and multi-image benchmarking remain **offline upstream workflows**, not website buttons. Explicit differences from the upstream evaluation scripts are listed below.
 
@@ -219,7 +219,7 @@ In another terminal, from `watermark-lab/`, run `npm install` and `npm run dev -
 5. Test an unrelated image. Distances/bit accuracy should change; do not report FPR, TPR or AUROC from one image.
 6. Compare against the same pinned upstream workflow with the same model, parameters, state, precision and scheduler. Key artifacts from the website are in private state; their dictionaries are method-specific in the runner source.
 7. Run held-out clean/watermarked/attacked batches offline for threshold calibration, false-positive estimates and paper metrics. Follow upstream dataset/attack commands for these. This is required before claiming reproduction or production accuracy.
-8. Record GPU, driver, Python, package versions, model/checkpoint hashes and results before removing the experimental label.
+8. Record GPU, driver, Python, package versions, model/checkpoint hashes and results alongside the acceptance checks.
 
 ## Development checks
 

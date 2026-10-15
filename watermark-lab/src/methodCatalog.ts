@@ -1,6 +1,6 @@
 export type CategoryId = 'latent-noise' | 'vae-decoder' | 'dual-semantic' | 'optimization-tamper' | 'learned-detector'
 export type RepositoryMethodId = 'tree-ring' | 'ring-id' | 'wind' | 't2smark' | 'gaussmarker' | 'seal' | 'robin' | 'tag-wm' | 'serum'
-export type WorkflowId = 'generate' | 'verify' | 'detect' | 'decode' | 'identify' | 'optimize' | 'localize' | 'train'
+export type WorkflowId = 'generate' | 'verify' | 'detect' | 'decode' | 'identify' | 'localize'
 
 export const categories: { id: CategoryId; name: string; detail: string; color: string }[] = [
   { id: 'latent-noise', name: 'Latent / Initial Noise', detail: 'Patterns and codes in diffusion noise', color: '#136f63' },

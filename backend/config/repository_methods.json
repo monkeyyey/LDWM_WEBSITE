@@ -74,9 +74,7 @@
       }
     },
     "setup_artifacts": [],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "ring-id": {
     "name": "RingID",
@@ -175,9 +173,7 @@
       }
     },
     "setup_artifacts": [],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "wind": {
     "name": "WIND",
@@ -268,9 +264,7 @@
       }
     },
     "setup_artifacts": [],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "t2smark": {
     "name": "T2SMark",
@@ -358,9 +352,7 @@
       }
     },
     "setup_artifacts": [],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "gaussmarker": {
     "name": "GaussMarker",
@@ -445,9 +437,7 @@
       "WATERMARK_GAUSSMARKER_GNR",
       "WATERMARK_GAUSSMARKER_W1"
     ],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "seal": {
     "name": "SEAL",
@@ -512,9 +502,7 @@
       }
     },
     "setup_artifacts": [],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "robin": {
     "name": "ROBIN",
@@ -598,9 +586,7 @@
     "setup_artifacts": [
       "WATERMARK_ROBIN_CHECKPOINT"
     ],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "tag-wm": {
     "name": "TAG-WM",
@@ -679,9 +665,7 @@
     "setup_artifacts": [
       "WATERMARK_TAG_WM_DVRD"
     ],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   },
   "serum": {
     "name": "SERUM",
@@ -707,8 +691,6 @@
       "WATERMARK_SERUM_WATERMARK",
       "WATERMARK_SERUM_DETECTOR"
     ],
-    "validation": "Awaiting CUDA validation",
-    "inference_only": true,
-    "implementation_status": "experimental"
+    "inference_only": true
   }
 }

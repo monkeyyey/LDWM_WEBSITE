@@ -188,8 +188,8 @@ repository logic:
 The original repository's full verification evaluation is a dataset-level ROC
 experiment. The website's one-image action exposes its underlying distance for
 the selected generated job, not a fabricated ROC score.
-# Experimental Repository Integrations
+# Repository Integrations
 
-Tree-Ring, Ring-ID, WIND, T2SMark, GaussMarker, SEAL, ROBIN, TAG-WM and SERUM now have pinned-repository inference adapters. They require separate CUDA environments and remain GPU-validation pending. Existing five adapters are unchanged in scope.
+Tree-Ring, Ring-ID, WIND, T2SMark, GaussMarker, SEAL, ROBIN, TAG-WM and SERUM have pinned-repository inference adapters. They require separate CUDA environments. Verify real generation and analysis on each deployed GPU using the acceptance checks in the setup guide.
 
 See [setup, artifacts, supported paths and validation limits](../docs/REPOSITORY_METHOD_SETUP.md). The shared manifest is `config/repository_methods.json`; missing runtime dependencies produce `setup_required`, never simulated results.

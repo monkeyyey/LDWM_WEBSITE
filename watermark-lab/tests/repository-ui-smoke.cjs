@@ -32,7 +32,7 @@ const variantGraphText = {
   'wind/fast': 'Image + one-entry registry',
   'tag-wm/trainable': 'Trained DVRD refinement',
   'tag-wm/trainfree': 'Train-free adaptive refinement',
-  'serum/serum': 'Train score model only',
+  'serum/serum': 'Saved latent CNN detector',
 };
 
 (async () => {
@@ -42,7 +42,10 @@ const variantGraphText = {
     const errors = [], requests = [];
     let setupFailure = false;
     page.on('pageerror', error => errors.push(error.message));
-    await page.route('**/jobs?**', route => route.fulfill({ json: { jobs: [] } }));
+    await page.route('**/jobs?**', route => {
+      const query = new URL(route.request().url()).searchParams;
+      return route.fulfill({ json: { jobs: [{ job_id: '123456abcdef', label: 'Job #1', prompt: 'Test image', method: query.get('method'), submethod_id: query.get('submethod'), image_url: '/files/ui-image.png' }] } });
+    });
     await page.route('**/files/ui-*.png', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64') }));
     await page.route('**/watermark/generate', route => {
       requests.push(route.request().postDataJSON());
@@ -54,18 +57,26 @@ const variantGraphText = {
       return route.fulfill({ json: { result: { job_id: 'abcdef123456', status: 'completed', workflow: 'detect', detection_score: 0, recovered_payload: '0101', runtime: 'real', image_url: null, raw: { summary: 'Native statistic; calibration required.', metrics: [{ label: 'Native score', value: .125 }, { label: 'Candidate count', value: 16 }], ...(request.method === 'tag-wm' ? { mask_url: '/files/ui-mask.png' } : {}) } } } });
     });
     await page.goto(process.env.UI_URL || 'http://127.0.0.1:5173');
-    const selectCategory = async name => page.locator('.category-button').filter({ has: page.locator('strong').getByText(name, { exact: true }) }).click();
+    const selectCategory = async name => {
+      if (await page.locator('.selector-stage.is-active .category-back').count()) await page.getByRole('button', { name: 'Back to categories' }).click();
+      await page.locator('.category-button').filter({ has: page.locator('strong').getByText(name, { exact: true }) }).click();
+      await page.locator('.method-grid').waitFor();
+      assert.equal(await page.locator('.selector-stage[aria-hidden="true"] .category-grid').count(), 1);
+      assert.equal(await page.locator('.selector-stage.is-active').count(), 1);
+    };
     const selectMethod = async name => page.locator('.method-card').filter({ has: page.locator('strong').getByText(name, { exact: true }) }).click();
     for (const [category, methods] of groups) {
       await selectCategory(category);
       for (const [name, id] of methods) {
         await selectMethod(name);
-        assert.equal(await page.locator('.planned-state').count(), 0);
+        assert.equal(await page.locator('.method-status').count(), 0);
+        assert.equal(await page.getByText('Experimental integration').count(), 0);
         assert.equal(await page.getByRole('button', { name: 'Run Generation', exact: true }).isEnabled(), true);
         const variants = catalog[id]?.variants.map(variant => [variant, `${name} / ${variant}`]) || originalVariants[id];
         for (const [variant, variantLabel] of variants) {
           await page.locator('.submethod-tabs').getByRole('button', { name: variantLabel, exact: true }).click();
           const panel = page.locator('.implementation-panel');
+          await panel.locator('.technical-details summary').click();
           const graph = await panel.locator('.process-map').textContent();
           if (variantGraphText[`${id}/${variant}`]) assert.ok(graph.includes(variantGraphText[`${id}/${variant}`]), `${id}/${variant} graph is not specific to its implementation`);
           assert.equal(await panel.getByRole('link', { name: 'Reviewed repository source' }).count(), 1);
@@ -79,9 +90,8 @@ const variantGraphText = {
             for (const option of Object.values(catalog[id].options)) assert.ok(defaults.includes(`${option.label}: ${option.default}`), `${id} default drift: ${option.label}`);
             for (const row of await panel.locator('.process-row').all()) {
               const label = await row.locator('.process-label strong').textContent();
-              const offline = label.includes('training') || label === 'Optimization';
-              assert.equal(await row.locator('.process-label span').textContent(), offline ? 'Offline upstream' : 'Website');
-              if (offline) assert.equal(await page.locator('.workflow-tabs').getByRole('button', { name: label, exact: true }).isDisabled(), true);
+              assert.ok(!label.includes('training') && label !== 'Optimization');
+              assert.equal(await row.locator('.process-label span').textContent(), 'Website');
             }
           }
           if (id === 'sfwmark') {
@@ -123,6 +133,26 @@ const variantGraphText = {
         }
       }
     }
+    // An edited image and its saved key must remain linked in either selection order.
+    await selectCategory('Latent / Initial Noise');
+    await selectMethod('Tree-Ring');
+    await page.locator('.workflow-tabs').getByRole('button', { name: 'Detection', exact: true }).click();
+    const upload = { name: 'edited.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64') };
+    await page.getByLabel('Linked generation job', { exact: true }).selectOption('123456abcdef');
+    await page.locator('input[type=file]').setInputFiles(upload);
+    await page.locator('.upload-zone').getByText('edited.png', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Run Detection', exact: true }).click();
+    await page.locator('.status-strip.done').waitFor();
+    assert.equal(requests.at(-1).sourceJobId, '123456abcdef');
+    assert.ok(requests.at(-1).imageDataUrl.startsWith('data:image/png;base64,'));
+    await page.getByLabel('Linked generation job', { exact: true }).selectOption('');
+    assert.equal(await page.getByRole('button', { name: 'Run Detection', exact: true }).isDisabled(), true);
+    await page.getByLabel('Linked generation job', { exact: true }).selectOption('123456abcdef');
+    await page.getByRole('button', { name: 'Run Detection', exact: true }).click();
+    await page.locator('.status-strip.done').waitFor();
+    assert.equal(requests.at(-1).sourceJobId, '123456abcdef');
+    assert.equal(requests.at(-1).imageName, 'edited.png');
+    assert.ok(requests.at(-1).imageDataUrl.startsWith('data:image/png;base64,'));
     for (const width of [1440, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });
       for (const [category, methods] of groups) {
@@ -130,7 +160,7 @@ const variantGraphText = {
         for (const [name] of methods) {
           await selectMethod(name);
           const overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, content: document.documentElement.scrollWidth,
-            clipped: [...document.querySelectorAll('.category-copy, .method-copy, .workflow-step, .repo-defaults span, .upstream-reference, .workflow-contract > div')].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.textContent) }));
+            clipped: [...document.querySelectorAll('.category-copy, .method-copy, .workflow-step, .repo-defaults span, .upstream-reference, .workflow-contract > div')].filter(el => el.checkVisibility() && el.scrollWidth > el.clientWidth + 1).map(el => el.textContent) }));
           assert.ok(overflow.content <= overflow.width, `${name} overflows at ${width}: ${JSON.stringify(overflow)}`);
           assert.deepEqual(overflow.clipped, [], `${name} clipped labels at ${width}`);
         }
@@ -144,12 +174,17 @@ const variantGraphText = {
     await page.getByRole('button', { name: 'Run Generation', exact: true }).click();
     await page.locator('.status-strip.done').waitFor();
     assert.ok((await page.locator('.result-panel').textContent()).includes('NVIDIA CUDA setup required'));
+    assert.equal(await page.locator('.status-strip.error .lucide-circle-alert').count(), 1);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: 'Back to categories' }).click();
+    assert.equal(await page.locator('.selector-stage.is-active').evaluate(el => getComputedStyle(el).transitionDuration), '0s');
+    assert.equal(await page.locator('.category-button:focus').count(), 1);
     await page.setViewportSize({ width: 390, height: 844 });
     await selectCategory('Optimization / Tamper Aware');
     await selectMethod('TAG-WM');
     await page.screenshot({ path: '/tmp/ldwm-repositories-mobile.png', fullPage: true });
     assert.deepEqual(errors, []);
-    console.log(`PASS: 14 methods / 21 variants, every action, source links, catalog defaults, variant graphs, offline labels, LDPC state requirement, fixed SFW seed, metrics, mask, setup error, and 320-1440px layouts. ${requests.length} mocked requests.`);
+    console.log(`PASS: 14 methods / 21 variants, every action, source links, catalog defaults, variant graphs, LDPC state requirement, fixed SFW seed, edited-image linkage, metrics, mask, setup error, reduced motion, focus restoration and 320-1440px layouts. ${requests.length} mocked requests.`);
   } finally {
     await browser.close();
   }
