@@ -3,6 +3,7 @@ import {
   Aperture,
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -610,10 +611,10 @@ function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar" aria-label="Watermark lab navigation">
+      <aside className="sidebar" aria-label="The Watermarking Library navigation">
         <div className="brand">
-          <div className="brand-mark"><Waves size={21} /></div>
-          <div><p className="eyebrow">Latent Domain</p><h1>Watermark Lab</h1><span className="owner-name">Chern Ze Hou</span></div>
+          <div className="brand-mark"><BookOpen size={22} strokeWidth={2.1} aria-hidden="true" /></div>
+          <div><p className="eyebrow">Latent domain methods</p><h1>The Watermarking Library</h1><span className="owner-name">Chern Ze Hou</span></div>
         </div>
         <div className="sidebar-context"><strong>{selectedMethod.name}</strong><span>{selectedSubmethod.name} · {selectedWorkflow.label}</span></div>
       </aside>

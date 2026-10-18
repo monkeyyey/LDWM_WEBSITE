@@ -25,17 +25,23 @@ def main() -> int:
 
 
 def generate(args, repo: Path):
+    from omegaconf import OmegaConf
+
     output = Path(args.output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     native_out = output / "native"
     native_out.mkdir(parents=True, exist_ok=True)
+    config = OmegaConf.load(args.config)
+    config.model.params.first_stage_config.params.ckpt_path = args.first_stage
+    effective_config = output / "lawa_config.yaml"
+    OmegaConf.save(config, effective_config)
     # The upstream script writes fixed evaluation CSV paths at shutdown but
     # does not create their parent directory during single-image inference.
     (repo / "results" / "SD14_LaWa").mkdir(parents=True, exist_ok=True)
     command = [
         os.environ.get("WATERMARK_LAWA_PYTHON", sys.executable),
         str(repo / "inference_AIGC.py"),
-        "--config", args.config,
+        "--config", str(effective_config),
         "--weight", args.weight,
         "--ckpt", args.ckpt,
         "--message", args.message,
@@ -81,6 +87,7 @@ def extract(args, repo: Path):
     # AutoencoderKL loader handles the pretrained checkpoint format used by
     # the repository; the duplicate top-level ldm package does not.
     config = OmegaConf.load(args.config).model
+    config.params.first_stage_config.params.ckpt_path = args.first_stage
     model = instantiate_from_config(config)
     state_dict = torch.load(args.weight, map_location="cpu")
     if "state_dict" in state_dict:
@@ -118,9 +125,10 @@ def parse_args():
     parser.add_argument("--image")
     parser.add_argument("--message", default="110111001110110001000000011101000110011100110101")
     parser.add_argument("--prompt", default="A white plate of food on a dining table")
-    parser.add_argument("--config", default="configs/SD14_LaWa_inference.yaml")
-    parser.add_argument("--weight", default="weights/LaWa/last.ckpt")
-    parser.add_argument("--ckpt", default="weights/stable-diffusion-v1/model.ckpt")
+    parser.add_argument("--config", default=os.environ.get("WATERMARK_LAWA_CONFIG", "configs/SD14_LaWa_inference.yaml"))
+    parser.add_argument("--weight", default=os.environ.get("WATERMARK_LAWA_WEIGHT", "weights/LaWa/last.ckpt"))
+    parser.add_argument("--first-stage", default=os.environ.get("WATERMARK_LAWA_FIRST_STAGE", "weights/first_stage_models/first_stage_KL-f8.ckpt"))
+    parser.add_argument("--ckpt", default=os.environ.get("WATERMARK_LAWA_SD_CHECKPOINT", "weights/stable-diffusion-v1/model.ckpt"))
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 

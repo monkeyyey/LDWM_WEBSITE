@@ -1,14 +1,15 @@
 .app-shell {
   min-height: 100svh;
-  background: #f5f7f8;
+  background: #f4f8f7;
   color: #171717;
 }
 
 .sidebar {
   align-items: center;
-  background: #ffffffed;
+  background: #fffffff2;
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid #deded8;
+  border-bottom: 1px solid #dce9e3;
+  box-shadow: 0 3px 18px #21483b0a;
   display: flex;
   gap: 24px;
   justify-content: space-between;
@@ -26,12 +27,14 @@
 
 .brand-mark {
   align-items: center;
-  background: #111111;
-  color: #ffffff;
+  background: #e3f3ed;
+  border: 1px solid #bee1d2;
+  border-radius: 10px;
+  color: #206354;
   display: grid;
-  height: 38px;
+  height: 42px;
   place-items: center;
-  width: 38px;
+  width: 42px;
 }
 
 .eyebrow {
@@ -98,9 +101,11 @@ button {
   gap: 8px;
   min-height: 40px;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    box-shadow 240ms ease,
+    transform 240ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .workspace {
@@ -132,16 +137,25 @@ button {
 }
 
 .primary-button {
-  background: #171717;
+  background: #234d43;
+  border-color: #234d43;
   color: #ffffff;
   font-weight: 650;
   min-width: 148px;
 }
 
 .reset-button:hover,
-.primary-button:hover,
 .method-card:hover {
-  border-color: #171717;
+  border-color: #87b3a4;
+  box-shadow: 0 5px 16px #234d4314;
+  transform: translateY(-2px);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #176b5b;
+  border-color: #176b5b;
+  box-shadow: 0 5px 16px #176b5b26;
+  transform: translateY(-2px);
 }
 
 .catalog-selector {
@@ -191,7 +205,7 @@ button {
 .method-card {
   align-items: flex-start;
   background: #ffffff;
-  border-color: #d9ded9;
+  border-color: #d8e4de;
   border-radius: 8px;
   color: #171717;
   min-height: 88px;
@@ -219,7 +233,7 @@ button {
 .category-button {
   align-items: flex-start;
   background: #ffffff;
-  border: 1px solid #d9ded9;
+  border: 1px solid #d8e4de;
   border-radius: 8px;
   box-shadow: inset 0 2px 0 var(--category-color);
   color: #222222;
@@ -231,7 +245,7 @@ button {
   min-width: 0;
   padding: 14px;
   text-align: left;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: background 220ms ease, border-color 220ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .category-icon {
@@ -242,8 +256,9 @@ button {
 }
 
 .category-button:hover {
+  background: color-mix(in srgb, var(--category-color) 6%, white);
   border-color: var(--category-color);
-  box-shadow: inset 0 3px 0 var(--category-color), 0 5px 16px #17231b14;
+  box-shadow: inset 0 3px 0 var(--category-color), 0 7px 18px #17231b14;
   transform: translateY(-2px);
 }
 
@@ -295,7 +310,7 @@ button {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d9ded9;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #171717;
   cursor: pointer;
   display: inline-flex;
@@ -343,13 +358,14 @@ a:focus-visible {
 
 .method-card.selected {
   border-color: var(--method-color);
-  background: color-mix(in srgb, var(--method-color) 5%, white);
-  box-shadow: inset 0 -2px 0 var(--method-color);
+  background: color-mix(in srgb, var(--method-color) 8%, white);
+  box-shadow: inset 0 -3px 0 var(--method-color), 0 3px 12px #17231b0f;
 }
 
 .method-token {
   align-items: center;
   background: #f1f1ed;
+  border-radius: 8px;
   color: var(--method-color);
   display: grid;
   flex: 0 0 auto;
@@ -420,8 +436,8 @@ a:focus-visible {
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
-  transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+  border-radius: 999px;
+  transition: background 220ms ease, color 220ms ease, border-color 220ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
   color: #5f5f59;
   cursor: pointer;
   display: inline-flex;
@@ -438,9 +454,14 @@ a:focus-visible {
 .workflow-tabs button:hover,
 .submethod-tabs button.active,
 .workflow-tabs button.active {
-  background: #233b36;
-  border-color: #233b36;
+  background: #265e51;
+  border-color: #265e51;
   color: #ffffff;
+}
+
+.submethod-tabs button:hover:not(:disabled),
+.workflow-tabs button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .workflow-tabs button.disabled,
@@ -470,7 +491,7 @@ a:focus-visible {
 .result-panel {
   background: #ffffff;
   border: 0;
-  border-top: 1px solid #dce3e3;
+  border-top: 2px solid #d7e8e1;
   min-width: 0;
   padding: 24px;
 }
@@ -542,6 +563,7 @@ select,
 textarea {
   background: #fbfbf8;
   border: 1px solid #d7d7d0;
+  border-radius: 8px;
   box-sizing: border-box;
   color: #171717;
   font: inherit;
@@ -628,6 +650,7 @@ textarea:focus {
 
 .repo-defaults span {
   background: #f1f1ed;
+  border-radius: 999px;
   color: #4f4f49;
   font-size: 12px;
   font-weight: 650;
@@ -775,8 +798,9 @@ textarea:focus {
 }
 
 .process-row.selected {
-  background: #f6f8f7;
+  background: #f0f8f4;
   box-shadow: inset 4px 0 0 var(--method-color);
+  transition: background 240ms ease;
 }
 
 .process-label {
@@ -834,6 +858,7 @@ textarea:focus {
 .source-job-note {
   background: #f7f3ec;
   border: 1px solid #e7ddd0;
+  border-radius: 8px;
   color: #605446;
   display: grid;
   gap: 4px;
@@ -850,6 +875,7 @@ textarea:focus {
 .evaluation-note {
   align-items: flex-start;
   background: #f1f1ed;
+  border-radius: 8px;
   color: #5f5f59;
   display: flex;
   font-size: 12px;
@@ -884,6 +910,8 @@ textarea:focus {
   display: grid;
   gap: 12px;
   grid-template-columns: 20px 1fr;
+  border-radius: 8px;
+  background: #f3f8f5;
   min-height: 48px;
   padding: 8px;
 }
@@ -934,6 +962,7 @@ input[type='range'] {
 .upload-zone {
   align-items: center;
   border: 1px dashed #bdbdb6;
+  border-radius: 8px;
   color: #5f5f59;
   cursor: pointer;
   flex-direction: row;
@@ -942,8 +971,9 @@ input[type='range'] {
 }
 
 .upload-zone:hover {
-  border-color: #171717;
-  color: #171717;
+  background: #f2f9f5;
+  border-color: #358371;
+  color: #20594d;
 }
 
 .upload-zone input {
@@ -958,8 +988,8 @@ input[type='range'] {
 }
 
 .image-stage {
-  background: #f3f6f6;
-  border-radius: 6px;
+  background: #eef5f3;
+  border-radius: 8px;
   display: grid;
   height: clamp(360px, 34vw, 500px);
   min-height: 0;
@@ -999,6 +1029,7 @@ input[type='range'] {
   background: rgba(255, 255, 255, 0.88);
   bottom: 12px;
   color: #171717;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 750;
   left: 12px;
@@ -1031,6 +1062,7 @@ input[type='range'] {
 .status-strip {
   align-items: center;
   background: #f1f1ed;
+  border-radius: 8px;
   display: flex;
   gap: 8px;
   margin: 14px 0;
@@ -1083,6 +1115,7 @@ input[type='range'] {
 
 .metric {
   border: 1px solid #eeeeea;
+  border-radius: 8px;
   min-height: 74px;
   min-width: 0;
   padding: 12px;
@@ -1147,6 +1180,8 @@ input[type='range'] {
 .error-details {
   background: #fff7f5;
   border: 1px solid #e7b9b1;
+  border-radius: 8px;
+  overflow: hidden;
   margin-top: 12px;
   max-width: 100%;
 }
@@ -1169,6 +1204,7 @@ input[type='range'] {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d8b5ae;
+  border-radius: 8px;
   color: #53251f;
   cursor: pointer;
   display: inline-flex;
@@ -1202,8 +1238,9 @@ input[type='range'] {
 
 .secondary-button {
   align-items: center;
-  background: #171717;
+  background: #234d43;
   border: 0;
+  border-radius: 8px;
   color: #ffffff;
   cursor: pointer;
   display: inline-flex;
@@ -1213,11 +1250,19 @@ input[type='range'] {
   gap: 8px;
   min-height: 40px;
   padding: 0 14px;
+  transition: background 220ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #176b5b;
+  box-shadow: 0 5px 16px #176b5b26;
+  transform: translateY(-2px);
 }
 
 .download-link {
   align-items: center;
   border: 1px solid #d7d7d0;
+  border-radius: 8px;
   color: #171717;
   display: inline-flex;
   font-size: 14px;
@@ -1226,10 +1271,13 @@ input[type='range'] {
   min-height: 40px;
   padding: 0 14px;
   text-decoration: none;
+  transition: background 220ms ease, border-color 220ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .download-link:hover {
-  border-color: #171717;
+  background: #f2f9f5;
+  border-color: #87b3a4;
+  transform: translateY(-2px);
 }
 
 @media (max-width: 1200px) {
@@ -1415,7 +1463,7 @@ input[type='range'] {
 .payload-summary span { color: #667471; font-size: 12px; }
 .payload-summary strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
 .image-placeholder { color: #778581; display: grid; gap: 14px; justify-items: center; font-size: 13px; }
-.primary-button, .reset-button, .secondary-button, .field input, .field select, .field textarea { border-radius: 6px; }
+.primary-button, .reset-button, .secondary-button, .field input, .field select, .field textarea { border-radius: 8px; }
 .field input, .field select, .field textarea { background: #fbfcfc; border-color: #d9e1df; transition: border-color 160ms ease, box-shadow 160ms ease; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: #136f63; box-shadow: 0 0 0 3px #136f6312; }
 .section-heading > svg, .api-note > svg { flex-shrink: 0; }

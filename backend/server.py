@@ -11,9 +11,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 from job_store import list_generation_jobs
 from registry import MethodRegistry
 from schemas import WatermarkRequest
+from environment import load_environment
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_environment()
 REGISTRY = MethodRegistry(PROJECT_ROOT)
 
 

@@ -60,14 +60,15 @@ class AdapterContracts(unittest.TestCase):
         self.assertEqual(saved["mask"].dtype, "float16")
         self.assertEqual(saved["mask"].device, "cpu")
 
-    def test_model_revision_defaults_to_fp16_and_can_be_overridden(self):
+    def test_model_revision_defaults_to_main_and_can_be_overridden(self):
         import noise_methods
         from types import SimpleNamespace
 
         context = SimpleNamespace(request={"method": "tree-ring"})
-        self.assertEqual(noise_methods.pipeline_revision(context), "fp16")
-        with patch.dict("os.environ", {"WATERMARK_TREE_RING_MODEL_REVISION": "main"}):
+        with patch.dict("os.environ", {}, clear=True):
             self.assertEqual(noise_methods.pipeline_revision(context), "main")
+        with patch.dict("os.environ", {"WATERMARK_TREE_RING_MODEL_REVISION": "custom-ref"}):
+            self.assertEqual(noise_methods.pipeline_revision(context), "custom-ref")
 
     def source(self, **overrides):
         source = self.root / "backend/storage/outputs/123456abcdef"

@@ -52,6 +52,7 @@ def run_repo_script(
     ]
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     try:
         completed = subprocess.run(
             command,

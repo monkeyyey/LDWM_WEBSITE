@@ -7,8 +7,17 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG = json.loads((ROOT / "backend/config/repository_methods.json").read_text())
+sys.path.insert(0, str(ROOT / "backend"))
+from environment import load_environment
+
+CATALOG = json.loads((ROOT / "backend/config/methods.json").read_text())
+CATALOG.update(json.loads((ROOT / "backend/config/repository_methods.json").read_text()))
 MODULES = {
+    "sfwmark": ["diffusers", "utils"],
+    "gaussian-shannon": ["diffusers", "ldpc"],
+    "lawa": ["models.modifiedAEDecoder", "omegaconf", "augly.image", "clip"],
+    "gaussian-shading": ["inverse_stable_diffusion", "watermark"],
+    "prc-watermark": ["inversion", "src.prc"],
     "tree-ring": ["inverse_stable_diffusion", "optim_utils"],
     "ring-id": ["inverse_stable_diffusion", "utils"],
     "wind": ["WIND_full", "WIND_fast"],
@@ -22,6 +31,8 @@ MODULES = {
 
 
 def main():
+    load_environment()
+    os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", choices=["all", *CATALOG], default="all")
     parser.add_argument("--clone", action="store_true", help="Download missing source checkouts; never overwrite an existing checkout")
@@ -47,7 +58,11 @@ def main():
             if subprocess.check_output(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"], text=True).strip():
                 raise RuntimeError("Modified tracked upstream files; checkout left untouched.")
             if args.check:
+                if method == "robin":
+                    (repo / "logs").mkdir(exist_ok=True)
                 code = "import torch, importlib; assert torch.cuda.is_available(), 'NVIDIA CUDA unavailable'; "
+                if method == "sfwmark":
+                    code += f"import sys; sys.path.insert(0, {str(repo / 'src')!r}); "
                 code += f"[importlib.import_module(m) for m in {MODULES[method]!r}]; print('CUDA and imports OK; model inference not tested')"
                 subprocess.run([python, "-c", code], cwd=repo, check=True, timeout=120)
                 for env in spec["setup_artifacts"]:

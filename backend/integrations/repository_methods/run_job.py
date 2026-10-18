@@ -130,6 +130,8 @@ def main():
         preflight(request, catalog)
         sys.path.insert(0, request["repo"])
         os.chdir(request["repo"])
+        if request["method"] == "robin":
+            (Path(request["repo"]) / "logs").mkdir(exist_ok=True)
         os.environ.setdefault("WANDB_MODE", "disabled")
         import torch
         if not torch.cuda.is_available():

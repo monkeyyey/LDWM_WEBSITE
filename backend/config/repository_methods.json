@@ -7,7 +7,7 @@
     "repo_env": "WATERMARK_TREE_RING_REPO",
     "python_env": "WATERMARK_TREE_RING_PYTHON",
     "model_env": "WATERMARK_TREE_RING_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "legacy",
     "variants": [
       "ring",
@@ -84,7 +84,7 @@
     "repo_env": "WATERMARK_RING_ID_REPO",
     "python_env": "WATERMARK_RING_ID_PYTHON",
     "model_env": "WATERMARK_RING_ID_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "legacy",
     "variants": [
       "ring-id"
@@ -183,7 +183,7 @@
     "repo_env": "WATERMARK_WIND_REPO",
     "python_env": "WATERMARK_WIND_PYTHON",
     "model_env": "WATERMARK_WIND_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "wind",
     "variants": [
       "full",
@@ -274,7 +274,7 @@
     "repo_env": "WATERMARK_T2SMARK_REPO",
     "python_env": "WATERMARK_T2SMARK_PYTHON",
     "model_env": "WATERMARK_T2SMARK_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1",
+    "default_model": "sd2-community/stable-diffusion-2-1",
     "profile": "t2s",
     "variants": [
       "sd21"
@@ -362,7 +362,7 @@
     "repo_env": "WATERMARK_GAUSSMARKER_REPO",
     "python_env": "WATERMARK_GAUSSMARKER_PYTHON",
     "model_env": "WATERMARK_GAUSSMARKER_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "legacy",
     "variants": [
       "chacha"
@@ -447,7 +447,7 @@
     "repo_env": "WATERMARK_SEAL_REPO",
     "python_env": "WATERMARK_SEAL_PYTHON",
     "model_env": "WATERMARK_SEAL_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "seal",
     "variants": [
       "seal"
@@ -512,7 +512,7 @@
     "repo_env": "WATERMARK_ROBIN_REPO",
     "python_env": "WATERMARK_ROBIN_PYTHON",
     "model_env": "WATERMARK_ROBIN_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "legacy",
     "variants": [
       "robin"
@@ -596,7 +596,7 @@
     "repo_env": "WATERMARK_TAG_WM_REPO",
     "python_env": "WATERMARK_TAG_WM_PYTHON",
     "model_env": "WATERMARK_TAG_WM_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "tag",
     "variants": [
       "trainable",
@@ -675,7 +675,7 @@
     "repo_env": "WATERMARK_SERUM_REPO",
     "python_env": "WATERMARK_SERUM_PYTHON",
     "model_env": "WATERMARK_SERUM_MODEL_ID",
-    "default_model": "stabilityai/stable-diffusion-2-1-base",
+    "default_model": "sd2-community/stable-diffusion-2-1-base",
     "profile": "serum",
     "variants": [
       "serum"

@@ -1,386 +1,42 @@
-# LDWM AWS Setup And Maintenance Guide
+# AWS Deployment and Maintenance
 
-This document describes how to run and maintain the LDWM website on an Ubuntu AWS GPU instance.
+Use an Ubuntu x86_64 NVIDIA GPU instance with a working driver. Confirm
+`nvidia-smi` works. The application does not install GPU drivers or provision
+AWS resources. The [root setup guide](../README.md) lists OS prerequisites and
+the complete installer workflow.
 
-The current production-style setup is:
+## Install as the application user
 
-```text
-Browser
-  -> https://ldwm.anyhow.sbs
-  -> Nginx on ports 80/443
-  -> Vite frontend on 127.0.0.1:5173
-  -> Python backend on 127.0.0.1:8000
-  -> SFWMark + Gaussian-Shannon + LaWa on the AWS GPU
-```
-
-## 1. AWS Instance
-
-Recommended instance family:
-
-```text
-g4dn.xlarge or another NVIDIA GPU instance
-```
-
-The current tested GPU was:
-
-```text
-Tesla T4
-```
-
-Recommended AMI:
-
-```text
-Deep Learning OSS Nvidia Driver AMI GPU PyTorch, Ubuntu 24.04
-```
-
-Recommended storage:
-
-```text
-At least 100 GB EBS
-```
-
-Stable Diffusion, SFWMark, Python packages, model caches, and generated images can use a lot of disk space.
-
-## 2. Security Group
-
-Inbound rules:
-
-```text
-22    TCP    your IP, or 0.0.0.0/0 while testing
-80    TCP    0.0.0.0/0
-443   TCP    0.0.0.0/0
-5173  TCP    optional, only needed if directly testing Vite without Nginx
-8000  TCP    optional, only needed if directly testing backend without Nginx
-```
-
-For the Nginx setup, the public website should only need:
-
-```text
-80
-443
-22
-```
-
-Keep `5173` and `8000` closed later if you want a cleaner production security posture, because Nginx proxies to those ports locally.
-
-## 3. Elastic IP And DNS
-
-Allocate an Elastic IP in EC2:
-
-```text
-EC2 -> Network & Security -> Elastic IPs -> Allocate Elastic IP address
-```
-
-Associate it to the GPU instance.
-
-Then create a DNS A record:
-
-```text
-Type: A
-Host: ldwm
-Value: <Elastic IP>
-TTL: 300 or 600
-```
-
-For the current domain:
-
-```text
-ldwm.anyhow.sbs -> 47.130.234.128
-```
-
-Check DNS from your Mac:
+Run setup as `ubuntu`, not `root`. Use the same account for installation,
+Hugging Face authentication and the backend service. This keeps virtualenv links,
+model caches, repositories and checkpoint permissions consistent.
 
 ```bash
-dig ldwm.anyhow.sbs +short
+cd /home/ubuntu/LDWM_WEBSITE
+bash setup.sh --artifacts /home/ubuntu/ldwm-artifacts --download-models
+bash setup.sh --check
 ```
 
-Expected output:
-
-```text
-47.130.234.128
-```
-
-## 4. SSH
-
-From your Mac:
-
-```bash
-ssh -i /path/to/your-key.pem ubuntu@47.130.234.128
-```
-
-Or, if DNS is working:
-
-```bash
-ssh -i /path/to/your-key.pem ubuntu@ldwm.anyhow.sbs
-```
-
-If macOS complains about key permissions:
-
-```bash
-chmod 400 /path/to/your-key.pem
-```
-
-## 5. Repository Location
-
-The AWS instance expects the project at:
-
-```bash
-/home/ubuntu/LDWM_WEBSITE
-```
-
-Normal update:
-
-```bash
-cd ~/LDWM_WEBSITE
-git pull
-```
-
-## 6. Python Virtual Environment
-
-Create the venv once:
-
-```bash
-cd ~/LDWM_WEBSITE
-sudo apt update
-sudo apt install -y python3-venv python3-pip
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install backend dependencies:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r backend/requirements.gpu.txt
-```
-
-Run SFWMark setup:
-
-```bash
-bash backend/integrations/sfwmark/setup_sfwmark.sh
-```
-
-This clones the official SFWMark repo into:
-
-```bash
-external/SFWMark
-```
-
-It also installs missing SFWMark dependencies and keeps the CUDA PyTorch already provided by the AWS Deep Learning AMI.
-
-## 7. Hugging Face Model Access
-
-SFWMark uses Stable Diffusion model weights from Hugging Face.
-
-If model download fails, log in:
-
-```bash
-source ~/LDWM_WEBSITE/.venv/bin/activate
-python -m pip install --force-reinstall "huggingface_hub[cli]>=0.24.0,<1.0"
-hf auth login
-```
-
-Important: keep `huggingface_hub` below `1.0`, because the current SFWMark dependency stack uses `transformers==4.48.1`.
-
-## 8. Gaussian-Shannon Environment
-
-Gaussian-Shannon has its own Python environment because its upstream
-requirements specify Python 3.12 and PyTorch 2.5.1. From the project root:
-
-```bash
-bash backend/integrations/gaussian_shannon/setup_gaussian_shannon.sh
-export WATERMARK_GS_REPO="$PWD/work/repos/Gaussian-Shannon"
-if command -v conda >/dev/null 2>&1; then
-  export WATERMARK_GS_PYTHON="$(conda run -n gaussian-shannon which python)"
-else
-  export WATERMARK_GS_PYTHON="$PWD/.venv-gaussian-shannon/bin/python"
-fi
-cat > .env.gpu <<EOF
-WATERMARK_GS_REPO=${WATERMARK_GS_REPO}
-WATERMARK_GS_PYTHON=${WATERMARK_GS_PYTHON}
-EOF
-```
-
-Confirm the environment before starting the backend:
-
-```bash
-"$WATERMARK_GS_PYTHON" - <<'PY'
-import torch
-import diffusers
-print(torch.__version__)
-print(diffusers.__version__)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no CUDA GPU")
-PY
-```
-
-The Gaussian-Shannon runner downloads or reuses
-`sd2-community/stable-diffusion-2-1-base` through Diffusers. Make sure the EC2
-instance has outbound access to Hugging Face and enough disk space for the
-model cache. The runner uses the upstream Gaussian redundancy of 64 and LDPC
-redundancy of 16.
-
-When the backend is managed by `systemctl`, do not rely on shell `export`
-commands. The service reads `/home/ubuntu/LDWM_WEBSITE/.env.gpu` through its
-`EnvironmentFile` entry, so these variables persist across shell sessions and
-reboots. Restart `ldwm-backend` after changing that file.
-
-Check versions:
-
-```bash
-python - <<'PY'
-import huggingface_hub
-import transformers
-import diffusers
-print("huggingface_hub:", huggingface_hub.__version__)
-print("transformers:", transformers.__version__)
-print("diffusers:", diffusers.__version__)
-PY
-```
-
-## 9. Node And Frontend Setup
-
-Install Node with `nvm`:
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.bashrc
-nvm install 22
-nvm use 22
-```
-
-Install frontend dependencies:
-
-```bash
-cd ~/LDWM_WEBSITE/watermark-lab
-npm install
-```
-
-## 10. Manual Run Commands
-
-Backend:
-
-```bash
-cd ~/LDWM_WEBSITE
-source .venv/bin/activate
-python backend/server.py --host 127.0.0.1 --port 8000
-```
-
-Frontend:
-
-```bash
-cd ~/LDWM_WEBSITE/watermark-lab
-npm run dev -- --host 127.0.0.1
-```
-
-With Nginx, access:
-
-```text
-https://ldwm.anyhow.sbs
-```
-
-## 11. Nginx Reverse Proxy
-
-Install Nginx:
-
-```bash
-sudo apt update
-sudo apt install -y nginx
-```
-
-Create:
-
-```bash
-sudo nano /etc/nginx/sites-available/ldwm
-```
-
-Use this config:
-
-```nginx
-server {
-    listen 80;
-    server_name ldwm.anyhow.sbs;
-
-    location / {
-        proxy_pass http://127.0.0.1:5173;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    location /api/ {
-        rewrite ^/api/(.*)$ /$1 break;
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-    }
-
-    location /files/ {
-        proxy_pass http://127.0.0.1:8000/files/;
-        proxy_set_header Host $host;
-    }
-}
-```
-
-Enable it:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/ldwm /etc/nginx/sites-enabled/ldwm
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 12. HTTPS With Certbot
-
-Install Certbot:
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-Issue/install certificate:
-
-```bash
-sudo certbot --nginx -d ldwm.anyhow.sbs
-```
-
-If Certbot says an existing certificate exists, choose:
-
-```text
-1: Attempt to reinstall this existing certificate
-```
-
-Check:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-curl -I https://ldwm.anyhow.sbs
-```
-
-## 13. systemd Services
-
-Use two services:
-
-```text
-ldwm-backend.service
-ldwm-frontend.service
-```
-
-### Backend Service
-
-Create:
-
-```bash
-sudo nano /etc/systemd/system/ldwm-backend.service
-```
-
-Paste:
+On an existing installation, export trained artifacts before migration. Setup
+preserves configured paths and refuses to overwrite changed upstream checkouts.
+The nine newer methods require clean pinned sources; the installer also pins the
+original five. Review any reported revision differences before changing paths.
+
+The installer writes a local `.env.gpu`, installs method runtimes under
+`.venvs/`, and builds static frontend files under `watermark-lab/dist/`.
+Existing external `*_PYTHON` overrides are reused without package installation
+into those environments. Verify generation and all available analysis actions
+on this GPU before publishing the site.
+
+## Run the backend with systemd
+
+Create `/etc/systemd/system/ldwm-backend.service`, adjusting paths and account
+for the machine. Use `LDWM_BACKEND_PYTHON` from `.env.gpu` if an existing
+backend executable was preserved instead of the default below.
 
 ```ini
 [Unit]
-Description=LDWM backend API
+Description=Watermark Lab backend
 After=network.target
 
 [Service]
@@ -388,310 +44,92 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/LDWM_WEBSITE
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/home/ubuntu/LDWM_WEBSITE/.env.gpu
-ExecStart=/home/ubuntu/LDWM_WEBSITE/.venv/bin/python backend/server.py --host 127.0.0.1 --port 8000
-Restart=always
+ExecStart=/home/ubuntu/LDWM_WEBSITE/.venvs/backend/bin/python backend/server.py --host 127.0.0.1 --port 8000
+Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
-
-### Frontend Service
-
-Find your Node path:
-
-```bash
-which node
-which npm
-```
-
-For the current Node version, create:
-
-```bash
-sudo nano /etc/systemd/system/ldwm-frontend.service
-```
-
-Paste:
-
-```ini
-[Unit]
-Description=LDWM Vite frontend
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/LDWM_WEBSITE/watermark-lab
-Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.23.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/home/ubuntu/.nvm/versions/node/v22.23.1/bin/npm run dev -- --host 127.0.0.1
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable ldwm-backend ldwm-frontend
-sudo systemctl restart ldwm-backend ldwm-frontend
-```
-
-Check status:
-
-```bash
+sudo systemctl enable --now ldwm-backend
 sudo systemctl status ldwm-backend --no-pager
-sudo systemctl status ldwm-frontend --no-pager
 ```
 
-## 14. Normal Maintenance Workflow
+The service starts after reboot. Changing `.env.gpu` requires a backend restart.
+The gateway also reads that file automatically for manual launches; an exported
+environment value takes precedence over its value in the file.
 
-After pushing code from local machine:
+## Serve the built frontend
+
+Use Nginx for the static build rather than the Vite development server:
 
 ```bash
-ssh -i /path/to/key.pem ubuntu@ldwm.anyhow.sbs
-cd ~/LDWM_WEBSITE
-git pull
-sudo systemctl restart ldwm-backend ldwm-frontend
+sudo apt-get install -y nginx
+sudo mkdir -p /var/www/ldwm
+sudo cp -R watermark-lab/dist/. /var/www/ldwm/
 ```
 
-If only frontend changed:
+Example Nginx site configuration; replace `your-domain.example`:
 
-```bash
-sudo systemctl restart ldwm-frontend
+```nginx
+server {
+    listen 80;
+    server_name your-domain.example;
+    root /var/www/ldwm;
+    index index.html;
+    client_max_body_size 20m;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_read_timeout 7200s;
+    }
+
+    location /files/ {
+        proxy_pass http://127.0.0.1:8000/files/;
+    }
+}
 ```
 
-If only backend changed:
+Enable the site, validate with `sudo nginx -t`, then reload Nginx. Configure
+HTTPS for the domain using your certificate manager. Place the site behind
+authenticated access: the API does not include user accounts or per-user limits.
+Only expose the web ports required by your deployment; keep backend port 8000
+and development port 5173 private. Limit SSH access to your administration IPs.
+
+A local development session can instead use `bash start.sh` in tmux, with SSH
+port forwarding for ports 5173 and 8000. The launcher stays in the foreground;
+a systemd service is what restarts a process after an instance reboot.
+
+## Update
 
 ```bash
+cd /home/ubuntu/LDWM_WEBSITE
+git pull --ff-only
+bash setup.sh --check
 sudo systemctl restart ldwm-backend
 ```
 
-If service files changed:
+For changed Python requirements, rerun setup for the affected methods. For UI
+changes, rebuild using the installed Node/npm and copy the new `dist/` contents
+to `/var/www/ldwm/`. Rebuilding does not require retraining watermark components.
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl restart ldwm-backend ldwm-frontend
-```
-
-## 15. Logs
-
-Backend logs:
-
-```bash
-journalctl -u ldwm-backend -f
-```
-
-Frontend logs:
-
-```bash
-journalctl -u ldwm-frontend -f
-```
-
-Nginx logs:
-
-```bash
-sudo tail -f /var/log/nginx/access.log
-sudo tail -f /var/log/nginx/error.log
-```
-
-Certbot logs:
-
-```bash
-sudo tail -f /var/log/letsencrypt/letsencrypt.log
-```
-
-## 16. Validation Commands
-
-Health check:
-
-```bash
+npm --prefix watermark-lab run build
+sudo cp -R watermark-lab/dist/. /var/www/ldwm/
 curl http://127.0.0.1:8000/health
-curl https://ldwm.anyhow.sbs/api/health
+journalctl -u ldwm-backend -n 100 --no-pager
 ```
 
-Frontend through Nginx:
-
-```bash
-curl -I https://ldwm.anyhow.sbs
-```
-
-Port check:
-
-```bash
-sudo ss -tlnp | grep -E ':80|:443|:5173|:8000'
-```
-
-Expected:
-
-```text
-nginx listening on 80/443
-node/Vite listening on 127.0.0.1:5173
-python backend listening on 127.0.0.1:8000
-```
-
-## 17. SFWMark Validation
-
-Generate one SFWMark image:
-
-```bash
-cd ~/LDWM_WEBSITE
-source .venv/bin/activate
-bash backend/integrations/sfwmark/smoke_official_generate.sh HSQR
-```
-
-Detect it:
-
-```bash
-bash backend/integrations/sfwmark/smoke_official_detect.sh HSQR
-```
-
-The supported website variants are:
-
-```text
-HSTR
-HSQR
-```
-
-Generated website jobs are stored in:
-
-```bash
-~/LDWM_WEBSITE/backend/storage/outputs/<job-id>/
-```
-
-Each generation job should contain:
-
-```text
-watermarked.png
-metadata.json
-pattern_list-2048.pt
-identify_gt_indices_1.npy
-```
-
-## 18. Common Problems
-
-### Website Shows Nginx Default Page
-
-Nginx is installed but the LDWM config is not enabled.
-
-Check:
-
-```bash
-ls -l /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Domain Returns 403 But IP Works
-
-Vite may reject the domain host. The project now allows:
-
-```text
-ldwm.anyhow.sbs
-```
-
-If changing domains, set `VITE_ALLOWED_HOSTS` or update `watermark-lab/vite.config.ts`.
-
-### Backend Not Reachable From HTTPS Site
-
-The frontend should call:
-
-```text
-/api
-```
-
-not:
-
-```text
-:8000
-```
-
-Check Nginx has the `/api/` proxy block.
-
-### Certbot NXDOMAIN
-
-DNS is not public yet.
-
-Check:
-
-```bash
-dig ldwm.anyhow.sbs +short
-```
-
-### Certbot Already Running
-
-Check:
-
-```bash
-ps aux | grep certbot
-```
-
-Kill if stuck:
-
-```bash
-sudo pkill -f certbot
-```
-
-### Python Says No pip Or Externally Managed Environment
-
-Use the venv:
-
-```bash
-cd ~/LDWM_WEBSITE
-source .venv/bin/activate
-python -m pip install ...
-```
-
-### Hugging Face Version Conflict
-
-If you see:
-
-```text
-huggingface-hub>=0.24.0,<1.0 is required
-```
-
-Run:
-
-```bash
-source ~/LDWM_WEBSITE/.venv/bin/activate
-python -m pip uninstall -y huggingface_hub huggingface-hub
-python -m pip install --no-cache-dir "huggingface_hub[cli]>=0.24.0,<1.0"
-```
-
-### GPU Not Detected
-
-Check:
-
-```bash
-nvidia-smi
-python - <<'PY'
-import torch
-print(torch.__version__)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
-PY
-```
-
-## 19. Disk Maintenance
-
-Check disk:
-
-```bash
-df -h
-du -sh ~/LDWM_WEBSITE/backend/storage/outputs
-du -sh ~/.cache/huggingface
-du -sh ~/.cache/torch
-```
-
-Generated images and model caches can grow large.
-
-To remove old generated jobs:
-
-```bash
-rm -rf ~/LDWM_WEBSITE/backend/storage/outputs/<job-id>
-```
-
-Do not delete `~/.cache/huggingface` unless you are willing to redownload model weights.
+Run one GPU job at a time. Keep model caches and the supplied artifact bundle
+available to the service user. Back up `backend/storage/outputs/` because linked
+analysis needs private generation state. Runtime freezes are saved in
+`work/setup/*.freeze.txt`; monitor both disk usage and GPU memory.

@@ -1,0 +1,15 @@
+torch==2.1.0
+torchvision==0.16.0
+diffusers==0.21.4
+transformers==4.29.2
+huggingface-hub==0.25.0
+accelerate==0.23.0
+safetensors==0.4.5
+numpy==1.26.0
+scipy==1.11.4
+galois==0.4.1
+ldpc==0.1.51
+datasets==2.14.7
+pyarrow==14.0.2
+Pillow==10.4.0
+tqdm==4.67.1

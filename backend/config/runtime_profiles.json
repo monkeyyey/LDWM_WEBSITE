@@ -1,0 +1,12 @@
+{
+  "sfwmark": {"python": "3.10", "torch": "2.5.1", "torchvision": "0.20.1", "cuda": "cu124"},
+  "gaussian-shannon": {"python": "3.12", "torch": "2.5.1", "torchvision": "0.20.1", "cuda": "cu124"},
+  "lawa": {"python": "3.8", "torch": "2.0.1", "torchvision": "0.15.2", "cuda": "cu118"},
+  "gaussian-shading": {"python": "3.10", "torch": "1.13.1", "torchvision": "0.14.1", "cuda": "cu117"},
+  "prc-watermark": {"python": "3.11", "torch": "2.1.0", "torchvision": "0.16.0", "cuda": "cu121"},
+  "legacy": {"python": "3.10", "torch": "1.13.0", "torchvision": "0.14.0", "cuda": "cu117"},
+  "wind": {"python": "3.10", "torch": "2.5.0", "torchvision": "0.20.0", "cuda": "cu124", "requirements": "seal.txt"},
+  "t2s": {"python": "3.10", "torch": "2.5.0", "torchvision": "0.20.0", "cuda": "cu124"},
+  "tag": {"python": "3.10", "torch": "1.13.0", "torchvision": "0.14.0", "cuda": "cu117"},
+  "serum": {"python": "3.10", "torch": "2.7.1", "torchvision": "0.22.1", "cuda": "cu118"}
+}

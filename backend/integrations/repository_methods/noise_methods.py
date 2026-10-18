@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 def pipeline_revision(c):
     method = c.request["method"].upper().replace("-", "_")
-    return os.environ.get(f"WATERMARK_{method}_MODEL_REVISION", "fp16")
+    return os.environ.get(f"WATERMARK_{method}_MODEL_REVISION", "main")
 
 
 def pipeline(c, module="inverse_stable_diffusion", scheduler=True):

@@ -2,6 +2,10 @@
 
 ## Scope
 
+For a new installation, use the root [setup.sh guide](../README.md). It installs
+the 14 methods, generates the local environment file, and verifies supplied
+artifact bundles. This document explains the nine additional adapters in detail.
+
 Nine repository inference integrations are wired to the website, in addition to the original five methods. They call official repository functions from pinned source checkouts, not approximations or simulated result generators.
 
 This development machine has no NVIDIA CUDA device or diffusion model installations. Frontend and CPU contract checks are not proof of real image generation, detection quality, or paper-level reproduction. Use the acceptance checks below to document results for each deployed environment.
@@ -28,7 +32,7 @@ Profiles in `backend/integrations/repository_methods/requirements/` are inferenc
 
 ## 1. Prepare the GPU server
 
-Use Linux with an NVIDIA GPU and Python 3.10 environments. This is not a CPU or Apple Silicon inference implementation. On Windows, use WSL2 with NVIDIA CUDA support and run these Linux commands inside WSL2.
+Use Linux x86_64 with an NVIDIA GPU. The nine methods described here use Python 3.10 environments; the original five also include Python 3.8, 3.11 and 3.12 runtimes. On Windows, use WSL2 with NVIDIA CUDA support and run the Linux installer there. macOS supports the frontend against a remote GPU backend.
 
 From the project root:
 
@@ -94,7 +98,12 @@ Add these to your backend service's environment file when deploying. The website
 | `tag-wm` | `WATERMARK_TAG_WM_PYTHON` | `WATERMARK_TAG_WM_REPO` |
 | `serum` | `WATERMARK_SERUM_PYTHON` | `WATERMARK_SERUM_REPO` |
 
-Each method also supports `WATERMARK_<METHOD>_MODEL_ID` with the same uppercase prefix, for example `WATERMARK_RING_ID_MODEL_ID`. The shared pipeline loader uses the `fp16` model revision by default; set `WATERMARK_<METHOD>_MODEL_REVISION` when the selected model repository uses a different ref (for example, `main`). Use the original SD 2.1 architecture/weights or a trusted local copy; changing to an unrelated model does not reproduce the method. T2SMark defaults to SD 2.1 (not the base variant), as in its repository. Model access/license acceptance and cache downloads must be arranged on the server. Offline model folders must contain the complete pipeline, including scheduler/tokenizer/VAE/UNet assets. SERUM instead takes its model and sampling settings from the saved SERUM YAML configuration; its generic MODEL_ID variable is not used.
+Each method also supports `WATERMARK_<METHOD>_MODEL_ID` with the same uppercase prefix, for example `WATERMARK_RING_ID_MODEL_ID`. Defaults use `sd2-community/stable-diffusion-2-1-base` and revision `main`; T2SMark uses `sd2-community/stable-diffusion-2-1` instead of the base variant. Set `WATERMARK_<METHOD>_MODEL_REVISION` for a different valid ref. Use matching SD 2.1 weights or a trusted complete local pipeline; changing to an unrelated model does not reproduce the method. Arrange model access and cache downloads on the server. SERUM takes model and sampling settings from its saved YAML; setup can use an explicitly supplied `WATERMARK_SERUM_MODEL_ID` to produce the local config copy without modifying the supplied YAML.
+
+The backend and setup tools read `.env.gpu` automatically. Existing exported
+values take precedence. `PYTHONDONTWRITEBYTECODE=1` prevents imports from modifying
+tracked bytecode in repositories such as TAG-WM. ROBIN's `logs/` directory is
+created before its import. Setup checks now cover all 14 pinned source checkouts.
 
 ## 3. Prepare method artifacts
 
@@ -194,7 +203,7 @@ export WATERMARK_SERUM_WATERMARK=/absolute/path/to/watermark.pt
 export WATERMARK_SERUM_DETECTOR=/absolute/path/to/score_model.pt
 ```
 
-The adapter supports the published 4x64x64 latent CNN and 512px images. It snapshots the config and detector with each job. Generation uses the native watermark/noise mixture; analysis uses native VAE encoding and the trained latent CNN. There is no diffusion inversion. Do not assume sigmoid 0.5 is a calibrated operating threshold.
+The adapter supports the published 4x64x64 latent CNN and 512px images. It snapshots the config and detector with each job. Generation uses the native watermark/noise mixture; analysis uses native VAE encoding and the trained latent CNN. There is no diffusion inversion. Do not assume sigmoid 0.5 is a calibrated operating threshold. A small dataset and one-epoch smoke checkpoint validates the pipeline only; it is not evidence of a calibrated or fully trained detector.
 
 ## 4. Audit and start
 
@@ -206,7 +215,7 @@ python3 backend/integrations/repository_methods/setup_repositories.py --method t
 python3 backend/server.py --host 127.0.0.1 --port 8000
 ```
 
-Use `--method all --check` after configuring all nine environments. The check verifies source revision, CUDA availability, imports and configured artifact paths; it **does not download weights or prove inference works**.
+Use `bash setup.sh --check` after configuring the runtimes. The repository helper's `--method all --check` covers all 14 methods. Checks verify source revision, CUDA availability, imports and configured artifact paths; they **do not download weights or prove inference works**. TAG-WM trainfree remains available without DVRD. To download model caches during installation, pass `--download-models` to the root installer.
 
 In another terminal, from `watermark-lab/`, run `npm install` and `npm run dev -- --host 127.0.0.1`. Use your existing production service/reverse-proxy procedure for deployment. Keep the backend private or behind authenticated access: the existing API has no user authentication, job listing exposes experiment metadata, and jobs can use significant GPU resources.
 

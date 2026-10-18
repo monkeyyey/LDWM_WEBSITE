@@ -13,3 +13,8 @@ node_modules/
 dist/
 .env
 .env.local
+.env.gpu
+.env.gpu.*
+!.env.gpu.example
+.venv*/
+.tools/

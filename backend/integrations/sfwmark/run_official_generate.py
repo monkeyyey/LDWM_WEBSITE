@@ -35,7 +35,7 @@ def main() -> int:
     output_dir_name = f"web_outputs/{args.job_id}"
     command = [
         os.environ.get("SFWMARK_PYTHON", sys.executable),
-        "generate.py",
+        str(Path(__file__).with_name("execute_generate.py")),
         "--wm_type",
         args.wm_type,
         "--dataset_id",
